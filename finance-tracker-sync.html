@@ -512,7 +512,7 @@ function toggleForm(id){var el=document.getElementById(id);el.style.display=el.s
 
 /* ═══ RECALC ═══ */
 function recalc(){
-  var baseIncome=D.config.income||0,extraInc=extraIncomeTotal(),income=baseInc+extraInc,fxd=fixedMonthly(),spent=getExpenses().reduce(function(s,e){return s+e.amt;},0);
+  var baseIncome=D.config.income||0,extraInc=extraIncomeTotal(),income=baseIncome+extraInc,fxd=fixedMonthly(),spent=getExpenses().reduce(function(s,e){return s+e.amt;},0);
   var savT=income*(D.config.savpct||20)/100,savA=Math.max(0,income-fxd-spent),bal=income-fxd-spent;
   document.getElementById('s-income').textContent=fmt(income);
   var spPct=income>0?(fxd+spent)/income*100:0,spBan=document.getElementById('spendBanner');
