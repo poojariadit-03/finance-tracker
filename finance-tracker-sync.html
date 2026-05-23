@@ -2482,6 +2482,7 @@ function renderAll(){
   var lentDt=document.getElementById('lentDate');if(lentDt)lentDt.value=todayStr();
   var lentDt=document.getElementById('lentDate');if(lentDt)lentDt.value=todayStr();
   var lentRetDt=document.getElementById('lentReturnBy');  /* ensure return-by stays blank */
+  checkDueDayAutoPay();
 }
 
 /* ═══ DATE RANGE FILTER FUNCTIONS ═══ */
