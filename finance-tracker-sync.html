@@ -862,16 +862,6 @@ function addExpense(){
   showToast('Added '+name+' — '+fmt(amt),'success');
 }
 
-function duplicateExpense(id){
-  var e=D.expenses.find(function(e){return e.id===id;});if(!e)return;
-  /* Use today if viewing current month, else first day of viewed month */
-  var now=new Date(),isCurMonth=curDate.getFullYear()===now.getFullYear()&&curDate.getMonth()===now.getMonth();
-  var dv=isCurMonth?todayStr():mk()+'-01',parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
-  D.expenses.push({id:Date.now().toString(),date:ed,month:m,name:e.name,cat:e.cat,amt:e.amt,accountId:e.accountId,note:e.note||'',tags:e.tags||''});
-  autoSave();renderExpenses();recalc();renderAccounts();
-  showToast('Duplicated: '+e.name,'success');
-}
-
 function removeExpense(id){D.expenses=D.expenses.filter(function(e){return e.id!==id;});autoSave();renderExpenses();recalc();renderAccounts();}
 function renderExpenses(textFilter,dateFilter){
   var arr=getExpenses(),accs=D.accounts,el=document.getElementById('expList');
