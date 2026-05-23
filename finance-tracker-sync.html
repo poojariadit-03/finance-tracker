@@ -1021,7 +1021,8 @@ function showDayPanel(d){var exps=getExpenses().filter(function(e){return new Da
 
 /* ═══ HISTORY ═══ */
 function renderHistory(){
-  var fxd=fixedMonthly(),months=[];for(var i=5;i>=0;i--)months.push(new Date(curDate.getFullYear(),curDate.getMonth()-i,1));
+  var n=typeof _histRangeMonths!=='undefined'&&_histRangeMonths>0?_histRangeMonths:6;
+  var fxd=fixedMonthly(),months=[];for(var i=n-1;i>=0;i--)months.push(new Date(curDate.getFullYear(),curDate.getMonth()-i,1));
   var data=months.map(function(d){var s=getExpenses(d).reduce(function(a,e){return a+e.amt;},0),mI=(D.config.income||0)+extraIncomeTotal(d),sav=Math.max(0,mI-fxd-s),bal=mI-fxd-s;return{label:d.toLocaleString('default',{month:'short',year:'numeric'}),income:mI,fxd:Math.round(fxd),spent:Math.round(s),savings:Math.round(sav),balance:Math.round(bal)};});
   if(_hist){_hist.destroy();_hist=null;}
   var dark=matchMedia('(prefers-color-scheme:dark)').matches;
@@ -1639,6 +1640,100 @@ function renderHealthScore(){
   });
   html+='</div>';
   el.innerHTML=html;
+}
+
+
+/* ═══ HISTORY RANGE FILTER ═══ */
+var _histRangeDays=0;
+var _histRangeMonths=6;
+
+function syncSavPill(val){
+  document.querySelectorAll('.hist-pill').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.hist-pill').forEach(function(p){
+    if(p.textContent.trim()===val+' Months')p.classList.add('active');
+  });
+}
+
+function setHistRange(val,btn){
+  document.querySelectorAll('.hist-pill').forEach(function(p){p.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  if(val<=30){
+    _histRangeDays=val;
+    _histRangeMonths=0;
+    renderHistoryDays(val);
+    renderSavingsComparison();
+  } else {
+    _histRangeDays=0;
+    _histRangeMonths=val;
+    var sel=document.getElementById('savingsMonthRange');
+    if(sel){
+      var valid=['3','6','12'];
+      sel.value=valid.indexOf(String(val))>-1?String(val):(val<=3?'3':val<=6?'6':'12');
+    }
+    renderHistory();
+  }
+}
+
+function renderHistoryDays(days){
+  var now=new Date();
+  var from=new Date(now);from.setDate(now.getDate()-(days-1));from.setHours(0,0,0,0);
+
+  var exps=D.expenses.filter(function(e){
+    var d=new Date(e.date);return d>=from&&d<=now;
+  });
+  var extraInc=(D.extraIncome||[]).filter(function(e){
+    var d=new Date(e.date);return d>=from&&d<=now;
+  });
+
+  var spent=exps.reduce(function(s,e){return s+e.amt;},0);
+  var baseInc=D.config.income||0;
+  var incTotal=extraInc.reduce(function(s,e){return s+e.amt;},0)+(baseInc/30*days);
+  var fxd=fixedMonthly()/30*days;
+  var sav=Math.max(0,incTotal-fxd-spent);
+
+  /* Category breakdown */
+  var cats={};exps.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
+  var sortedCats=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];});
+
+  /* Daily spend map */
+  var dailyMap={};
+  exps.forEach(function(e){
+    var dk=e.date.slice(0,10);
+    dailyMap[dk]=(dailyMap[dk]||0)+e.amt;
+  });
+  var dailyKeys=Object.keys(dailyMap).sort();
+
+  /* Rebuild chart with daily data */
+  if(_hist){try{_hist.destroy();}catch(e){}_hist=null;}
+  var dark=document.body.classList.contains('force-dark')||(!document.body.classList.contains('force-light')&&matchMedia('(prefers-color-scheme:dark)').matches);
+  var gc=dark?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)';
+  _hist=new Chart(document.getElementById('histChart'),{
+    type:'bar',
+    data:{
+      labels:dailyKeys.map(function(d){return new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});}),
+      datasets:[{label:'Spent',data:dailyKeys.map(function(k){return dailyMap[k];}),backgroundColor:'#D4537E',borderRadius:4}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45,autoSkip:dailyKeys.length>12}},
+        y:{grid:{color:gc},ticks:{callback:function(v){return '\u20B9'+(v>=1000?(v/1000).toFixed(0)+'K':v);}}}}}
+  });
+  var legEl=document.getElementById('histLeg');
+  if(legEl)legEl.innerHTML='<span class="legitem"><span class="legdot" style="background:#D4537E"></span>Daily spending — last '+days+' days</span>';
+
+  /* Summary table */
+  var fromStr=from.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+  var toStr=now.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  var el=document.getElementById('histBody');
+  if(!el)return;
+  var rows='';
+  rows+='<tr style="background:var(--sur2)"><td colspan="6" style="font-weight:600;padding:10px 8px">'+fromStr+' to '+toStr+' ('+days+' days)</td></tr>';
+  rows+='<tr><td>Total Spent</td><td style="color:var(--red)">'+fmt(spent)+'</td><td>'+exps.length+' expenses</td><td>Avg/day: '+fmt(Math.round(spent/days))+'</td><td></td><td></td></tr>';
+  rows+='<tr><td>Est. Savings</td><td style="color:var(--green)">'+fmt(Math.round(sav))+'</td><td></td><td></td><td></td><td></td></tr>';
+  sortedCats.slice(0,5).forEach(function(c){
+    var pct=spent>0?(cats[c]/spent*100).toFixed(0):0;
+    rows+='<tr><td style="color:var(--tx3)">'+c+'</td><td>'+fmt(cats[c])+'</td><td style="color:var(--tx3)">'+pct+'% of spend</td><td></td><td></td><td></td></tr>';
+  });
+  el.innerHTML=rows;
 }
 
 function initDefaults(){if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];}
