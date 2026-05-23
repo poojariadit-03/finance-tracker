@@ -5,7 +5,96 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Finance Tracker ₹</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js">
+/* ═══ DATE RANGE FILTER FUNCTIONS ═══ */
+function applyDateRange(){
+  _rangeFrom=document.getElementById('rangeFrom').value||null;
+  _rangeTo=document.getElementById('rangeTo').value||null;
+  if(!_rangeFrom&&!_rangeTo){clearDateRange();return;}
+  renderExpensesRange();
+}
+function clearDateRange(){
+  _rangeFrom=null;_rangeTo=null;
+  var rf=document.getElementById('rangeFrom');if(rf)rf.value='';
+  var rt=document.getElementById('rangeTo');if(rt)rt.value='';
+  var rr=document.getElementById('rangeResult');if(rr)rr.style.display='none';
+  renderExpenses();
+}
+function renderExpensesRange(){
+  if(!_rangeFrom&&!_rangeTo){clearDateRange();return;}
+  var from=_rangeFrom?new Date(_rangeFrom+'T00:00:00'):null;
+  var to=_rangeTo?new Date(_rangeTo+'T23:59:59'):null;
+  var all=D.expenses.filter(function(e){
+    var d=new Date(e.date);
+    if(from&&d<from)return false;
+    if(to&&d>to)return false;
+    return true;
+  });
+  var q=document.getElementById('expSearch')?document.getElementById('expSearch').value.trim().toLowerCase():'';
+  if(q)all=all.filter(function(e){return e.name.toLowerCase().indexOf(q)>-1||e.cat.toLowerCase().indexOf(q)>-1||(e.note&&e.note.toLowerCase().indexOf(q)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(q)>-1);});
+  all.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  var total=all.reduce(function(s,e){return s+e.amt;},0);
+  var cats={};all.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
+  var topCat=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];})[0]||'--';
+  var uniqueDays=new Set(all.map(function(e){return e.date.slice(0,10);})).size;
+  var resEl=document.getElementById('rangeResult');
+  if(resEl){resEl.style.display='block';resEl.innerHTML='<span class="range-stat">'+all.length+' expenses</span><span class="range-stat">Total: <strong>'+fmt(total)+'</strong></span><span class="range-stat">Avg/day: <strong>'+fmt(uniqueDays>0?Math.round(total/uniqueDays):0)+'</strong></span><span class="range-stat">Top: <strong>'+topCat+'</strong></span>';}
+  var accs=D.accounts,el=document.getElementById('expList');
+  if(!all.length){if(el)el.innerHTML='<p class="empty">No expenses in this date range.</p>';renderBudgetBars();checkBudgetAlerts();return;}
+  if(el)el.innerHTML=all.map(function(e){
+    var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    var acc=accs.find(function(a){return a.id===e.accountId;});
+    var tagHtml='';if(e.tags){e.tags.split(' ').filter(Boolean).forEach(function(t){tagHtml+='<span style="display:inline-block;background:var(--bbg,#E6F1FB);color:var(--blue);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:3px">'+t+'</span>';});}
+    var noteHtml=e.note?'<div style="font-size:11px;color:var(--tx3);font-style:italic">'+e.note+'</div>':'';
+    return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span><button class="edit-btn" onclick="openEdit('\''+e.id+'\')" >Edit</button><button class="del-btn" onclick="removeExpense('\''+e.id+'\')" >x</button></div></div>';
+  }).join('');
+  renderBudgetBars();checkBudgetAlerts();
+}
+
+/* ═══ SAVINGS COMPARISON ═══ */
+function renderSavingsComparison(){
+  var el=document.getElementById('savingsComparisonBody');if(!el)return;
+  var nEl=document.getElementById('savingsMonthRange');
+  var n=nEl?parseInt(nEl.value):6;
+  var fxd=fixedMonthly();
+  var savGoalPct=(D.config.savpct||20)/100;
+  var months=[];
+  for(var i=n-1;i>=0;i--)months.push(new Date(curDate.getFullYear(),curDate.getMonth()-i,1));
+  var data=months.map(function(d){
+    var spent=getExpenses(d).reduce(function(s,e){return s+e.amt;},0);
+    var mIncome=(D.config.income||0)+extraIncomeTotal(d);
+    var savAmt=Math.max(0,mIncome-fxd-spent);
+    var savGoal=mIncome*savGoalPct;
+    var savRate=mIncome>0?savAmt/mIncome*100:0;
+    var metGoal=savAmt>=savGoal&&mIncome>0;
+    return{label:d.toLocaleString('default',{month:'short'})+'|'+d.getFullYear().toString().slice(2),savAmt:savAmt,savGoal:savGoal,savRate:savRate,income:mIncome,metGoal:metGoal};
+  });
+  var maxSav=Math.max.apply(null,data.map(function(d){return Math.max(d.savAmt,d.savGoal,1);}));
+  var best=data.slice().sort(function(a,b){return b.savAmt-a.savAmt;})[0];
+  var avgSav=data.filter(function(d){return d.savAmt>0;}).reduce(function(s,d){return s+d.savAmt;},0)/(data.filter(function(d){return d.savAmt>0;}).length||1);
+  var totalSav=data.reduce(function(s,d){return s+d.savAmt;},0);
+  var metCount=data.filter(function(d){return d.metGoal;}).length;
+  var bars=data.map(function(d){
+    var h=Math.round(d.savAmt/maxSav*120);
+    var goalH=Math.round(d.savGoal/maxSav*120);
+    var col=d.metGoal?'var(--green)':d.savAmt>0?'var(--amber)':'var(--bdr)';
+    var parts=d.label.split('|');
+    return '<div class="sav-bar-wrap"><div class="sav-bar-amt" style="color:'+col+';font-size:8px">'+(d.savAmt>0?fmt(d.savAmt):'--')+'</div><div class="sav-bar-outer" style="height:120px"><div class="sav-bar-inner" style="height:'+h+'px;background:'+col+'"></div>'+(d.savGoal>0?'<div class="sav-bar-goal" style="bottom:'+goalH+'px"></div>':'')+'</div><div class="sav-bar-label">'+parts[0]+'<br>''+parts[1]+'</div></div>';
+  }).join('');
+  var html='<div class="sav-bars">'+bars+'</div>';
+  html+='<div class="sav-stats-row"><div class="sav-stat"><div class="sav-stat-label">Total saved</div><div class="sav-stat-val" style="color:var(--green)">'+fmt(totalSav)+'</div></div><div class="sav-stat"><div class="sav-stat-label">Monthly avg</div><div class="sav-stat-val">'+fmt(Math.round(avgSav))+'</div></div><div class="sav-stat"><div class="sav-stat-label">Best month</div><div class="sav-stat-val" style="color:var(--green)">'+fmt(best.savAmt)+'<div style="font-size:10px;color:var(--tx3)">'+best.label.replace('|'," '")+'</div></div></div><div class="sav-stat"><div class="sav-stat-label">Goal met</div><div class="sav-stat-val" style="color:'+(metCount===n?'var(--green)':'var(--amber)')+'">'+metCount+'/'+n+' months</div></div></div>';
+  html+='<div style="overflow-x:auto;margin-top:12px"><table class="htable"><thead><tr><th>Month</th><th>Income</th><th>Saved</th><th>Rate</th><th>Goal</th><th>Status</th></tr></thead><tbody>';
+  data.slice().reverse().forEach(function(d){
+    var rateCol=d.savRate>=savGoalPct*100?'var(--green)':d.savRate>0?'var(--amber)':'var(--red)';
+    html+='<tr><td>'+d.label.replace('|'," '")+'</td><td>'+fmt(d.income)+'</td><td style="color:var(--green)">'+fmt(d.savAmt)+'</td><td style="color:'+rateCol+'">'+d.savRate.toFixed(1)+'%</td><td>'+fmt(d.savGoal)+'</td><td>'+(d.income===0?'<span style="color:var(--tx3)">No income</span>':d.metGoal?'<span style="color:var(--green)">Met</span>':'<span style="color:var(--amber)">Below</span>')+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+
+/* ═══ NET WORTH - pendingLent ═══ */
+
+</script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -427,6 +516,17 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <input type="text" id="expNote" placeholder="Note (optional, e.g. work reimbursable)" style="flex:2">
       <input type="text" id="expTags" placeholder="Tags e.g. #work #reimbursable" style="flex:1">
     </div>
+    <div class="range-filter-wrap" id="dateRangeWrap">
+      <div class="range-filter-row">
+        <span class="range-label">From</span>
+        <input type="date" id="rangeFrom" style="max-width:145px;margin-bottom:0" onchange="applyDateRange()">
+        <span class="range-label">To</span>
+        <input type="date" id="rangeTo" style="max-width:145px;margin-bottom:0" onchange="applyDateRange()">
+        <button class="btn" onclick="applyDateRange()" style="padding:6px 14px;font-size:13px">Filter</button>
+        <button class="btn-ghost" onclick="clearDateRange()" style="padding:6px 12px;font-size:12px">Clear</button>
+      </div>
+      <div class="range-result" id="rangeResult" style="display:none"></div>
+    </div>
     <div class="qfilter" id="qfilterRow">
       <button class="qpill active" onclick="setQFilter('all',this)">All</button>
       <button class="qpill" onclick="setQFilter('today',this)">Today</button>
@@ -605,6 +705,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
 <div class="ft-toast" id="ftToast"></div>
 
 <script>
+
 /* ═══ DATA ═══ */
 var D={config:{income:0,savpct:20,theme:'auto',fontSize:'normal',dailyLimit:0},accounts:[],expenses:[],fixed:[],paid:{},goals:[],fds:[],rds:[],budgets:{},autoLogged:[],extraIncome:[],monthResetSeen:[],customCategories:[],liabilities:[],lent:[]};
 
@@ -912,6 +1013,7 @@ function addExpense(){
 
 function removeExpense(id){D.expenses=D.expenses.filter(function(e){return e.id!==id;});autoSave();renderExpenses();recalc();renderAccounts();}
 function renderExpenses(textFilter,dateFilter){
+  if(typeof _rangeFrom!=='undefined'&&(_rangeFrom||_rangeTo)){renderExpensesRange();return;}
   var arr=getExpenses(),accs=D.accounts,el=document.getElementById('expList');
   if(textFilter){var q=textFilter.toLowerCase();arr=arr.filter(function(e){return e.name.toLowerCase().indexOf(q)>-1||e.cat.toLowerCase().indexOf(q)>-1||(e.note&&e.note.toLowerCase().indexOf(q)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(q)>-1);});}
   if(dateFilter){arr=arr.filter(function(e){return new Date(e.date).toISOString().slice(0,10)===dateFilter;});}
@@ -1646,6 +1748,7 @@ function renderHealthScore(){
 /* ═══ HISTORY RANGE FILTER ═══ */
 var _histRangeDays=0;
 var _histRangeMonths=6;
+var _rangeFrom=null,_rangeTo=null;
 
 function syncSavPill(val){
   document.querySelectorAll('.hist-pill').forEach(function(p){p.classList.remove('active');});
@@ -1745,11 +1848,78 @@ function renderAll(){
   populateCatSelects();renderCustomCategories();
   renderAccounts();populateAccSel();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();autoLogFixed();
   renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();
-  applyTheme(D.config.theme||'auto');applyFontSize(D.config.fontSize||'normal');updateLentBadge();
+  applyTheme(D.config.theme||'auto');applyFontSize(D.config.fontSize||'normal');updateLentBadge();renderLent();
   var incDt=document.getElementById('incDate');if(incDt)incDt.value=todayStr();
   if(D.config&&D.config.dailyLimit){var dli=document.getElementById('dailyLimitInput');if(dli)dli.value=D.config.dailyLimit;}
-  var lentDt=document.getElementById('lentDate');if(lentDt&&!lentDt.value)lentDt.value=todayStr();
+  var lentDt=document.getElementById('lentDate');if(lentDt)lentDt.value=todayStr();
+  var lentDt=document.getElementById('lentDate');if(lentDt)lentDt.value=todayStr();
   var lentRetDt=document.getElementById('lentReturnBy');  /* ensure return-by stays blank */
+}
+
+/* ═══ DATE RANGE FILTER FUNCTIONS ═══ */
+function applyDateRange(){
+  _rangeFrom=document.getElementById('rangeFrom').value||null;
+  _rangeTo=document.getElementById('rangeTo').value||null;
+  if(!_rangeFrom&&!_rangeTo){clearDateRange();return;}
+  renderExpensesRange();
+}
+function clearDateRange(){
+  _rangeFrom=null;_rangeTo=null;
+  var rf=document.getElementById('rangeFrom');if(rf)rf.value='';
+  var rt=document.getElementById('rangeTo');if(rt)rt.value='';
+  var rr=document.getElementById('rangeResult');if(rr)rr.style.display='none';
+  renderExpenses();
+}
+function renderExpensesRange(){
+  if(!_rangeFrom&&!_rangeTo){clearDateRange();return;}
+  var from=_rangeFrom?new Date(_rangeFrom+'T00:00:00'):null;
+  var to=_rangeTo?new Date(_rangeTo+'T23:59:59'):null;
+  var all=D.expenses.filter(function(e){var d=new Date(e.date);if(from&&d<from)return false;if(to&&d>to)return false;return true;});
+  var q=document.getElementById('expSearch')?document.getElementById('expSearch').value.trim().toLowerCase():'';
+  if(q)all=all.filter(function(e){return e.name.toLowerCase().indexOf(q)>-1||e.cat.toLowerCase().indexOf(q)>-1||(e.note&&e.note.toLowerCase().indexOf(q)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(q)>-1);});
+  all.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  var total=all.reduce(function(s,e){return s+e.amt;},0);
+  var cats={};all.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
+  var topCat=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];})[0]||'--';
+  var uDays=new Set(all.map(function(e){return e.date.slice(0,10);})).size;
+  var resEl=document.getElementById('rangeResult');
+  if(resEl){resEl.style.display='block';resEl.innerHTML='<span class="range-stat">'+all.length+' expenses</span><span class="range-stat">Total: <strong>'+fmt(total)+'</strong></span><span class="range-stat">Avg/day: <strong>'+fmt(uDays>0?Math.round(total/uDays):0)+'</strong></span><span class="range-stat">Top: <strong>'+topCat+'</strong></span>';}
+  var accs=D.accounts,el=document.getElementById('expList');
+  if(!all.length){if(el)el.innerHTML='<p class="empty">No expenses in this date range.</p>';renderBudgetBars();checkBudgetAlerts();return;}
+  if(el)el.innerHTML=all.map(function(e){
+    var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    var acc=accs.find(function(a){return a.id===e.accountId;});
+    var id=e.id;
+    var tagHtml='';if(e.tags){e.tags.split(' ').filter(Boolean).forEach(function(t){tagHtml+='<span style="display:inline-block;background:var(--bbg,#E6F1FB);color:var(--blue);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:3px">'+t+'</span>';});}
+    var noteHtml=e.note?'<div style="font-size:11px;color:var(--tx3);font-style:italic">'+e.note+'</div>':'';
+    var row='<div class="erow"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span>';
+    row+='<button class="edit-btn" onclick="openEdit(this.dataset.id)" data-id="'+id+'">Edit</button>';
+    row+='<button class="del-btn" onclick="removeExpense(this.dataset.id)" data-id="'+id+'">x</button>';
+    row+='</div></div>';
+    return row;
+  }).join('');
+  renderBudgetBars();checkBudgetAlerts();
+}
+
+/* ═══ SAVINGS COMPARISON ═══ */
+function renderSavingsComparison(){
+  var el=document.getElementById('savingsComparisonBody');if(!el)return;
+  var nEl=document.getElementById('savingsMonthRange');
+  var n=nEl?parseInt(nEl.value):6;
+  var fxd=fixedMonthly(),savGoalPct=(D.config.savpct||20)/100;
+  var months=[];for(var i=n-1;i>=0;i--)months.push(new Date(curDate.getFullYear(),curDate.getMonth()-i,1));
+  var data=months.map(function(d){var spent=getExpenses(d).reduce(function(s,e){return s+e.amt;},0);var mI=(D.config.income||0)+extraIncomeTotal(d);var sav=Math.max(0,mI-fxd-spent);var savG=mI*savGoalPct;return{label:d.toLocaleString('default',{month:'short'})+'|'+d.getFullYear().toString().slice(2),savAmt:sav,savGoal:savG,savRate:mI>0?sav/mI*100:0,income:mI,metGoal:sav>=savG&&mI>0};});
+  var maxSav=Math.max.apply(null,data.map(function(d){return Math.max(d.savAmt,d.savGoal,1);}));
+  var best=data.slice().sort(function(a,b){return b.savAmt-a.savAmt;})[0];
+  var posM=data.filter(function(d){return d.savAmt>0;});
+  var avgSav=posM.length?posM.reduce(function(s,d){return s+d.savAmt;},0)/posM.length:0;
+  var totalSav=data.reduce(function(s,d){return s+d.savAmt;},0);
+  var metCount=data.filter(function(d){return d.metGoal;}).length;
+  var bars=data.map(function(d){var h=Math.round(d.savAmt/maxSav*120),gH=Math.round(d.savGoal/maxSav*120);var col=d.metGoal?'var(--green)':d.savAmt>0?'var(--amber)':'var(--bdr)';var p=d.label.split('|');return '<div class="sav-bar-wrap"><div class="sav-bar-amt" style="color:'+col+';font-size:8px">'+(d.savAmt>0?fmt(d.savAmt):'--')+'</div><div class="sav-bar-outer" style="height:120px"><div class="sav-bar-inner" style="height:'+h+'px;background:'+col+'"></div>'+(d.savGoal>0?'<div class="sav-bar-goal" style="bottom:'+gH+'px"></div>':'')+'</div><div class="sav-bar-label">'+p[0]+'<br>&#39;'+p[1]+'</div></div>';}).join('');
+  var html='<div class="sav-bars">'+bars+'</div><div class="sav-stats-row"><div class="sav-stat"><div class="sav-stat-label">Total saved</div><div class="sav-stat-val" style="color:var(--green)">'+fmt(totalSav)+'</div></div><div class="sav-stat"><div class="sav-stat-label">Avg/month</div><div class="sav-stat-val">'+fmt(Math.round(avgSav))+'</div></div><div class="sav-stat"><div class="sav-stat-label">Best month</div><div class="sav-stat-val" style="color:var(--green)">'+fmt(best.savAmt)+'<div style="font-size:10px;color:var(--tx3)">'+best.label.replace('|'," '")+'</div></div></div><div class="sav-stat"><div class="sav-stat-label">Goal met</div><div class="sav-stat-val" style="color:'+(metCount===n?'var(--green)':'var(--amber)')+'">'+metCount+'/'+n+'</div></div></div>';
+  html+='<div style="overflow-x:auto;margin-top:12px"><table class="htable"><thead><tr><th>Month</th><th>Income</th><th>Saved</th><th>Rate</th><th>Goal</th><th>Status</th></tr></thead><tbody>';
+  data.slice().reverse().forEach(function(d){var rc=d.savRate>=(savGoalPct*100)?'var(--green)':d.savRate>0?'var(--amber)':'var(--red)';html+='<tr><td>'+d.label.replace('|'," '")+'</td><td>'+fmt(d.income)+'</td><td style="color:var(--green)">'+fmt(d.savAmt)+'</td><td style="color:'+rc+'">'+d.savRate.toFixed(1)+'%</td><td>'+fmt(d.savGoal)+'</td><td>'+(d.income===0?'--':d.metGoal?'<span style="color:var(--green)">Met</span>':'<span style="color:var(--amber)">Below</span>')+'</td></tr>';});
+  el.innerHTML=html+'</tbody></table></div>';
 }
 
 /* ═══ AUTO-LOAD ═══ */
