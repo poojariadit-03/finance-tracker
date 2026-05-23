@@ -544,6 +544,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <select id="expAcc" style="min-width:120px"></select>
       <input type="number" id="expAmt" placeholder="₹ Amount" min="0" step="1" style="max-width:120px">
       <input type="date" id="expDate" style="max-width:145px">
+      <label class="chkrow" style="flex-shrink:0"><input type="checkbox" id="expRecurring"> Add to Fixed</label>
       <button class="btn" onclick="addExpense()">+ Add</button>
     </div>
     <div class="irow" style="margin-bottom:4px">
@@ -568,6 +569,8 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <button class="qpill" id="reimbPill" onclick="setQFilter('reimb',this)">💰 Reimbursable</button>
     </div>
     <div class="srch-wrap"><span class="srch-ico">&#128269;</span><input type="text" id="expSearch" placeholder="Search expenses…" oninput="searchExpenses(this.value)" style="width:100%"></div>
+    <div class="bulk-bar" id="bulkBar"><span id="bulkCount">0 selected</span><div style="display:flex;gap:8px"><button class="btn" style="background:var(--red);padding:5px 12px;font-size:12px" onclick="bulkDelete()">🗑 Delete selected</button><button class="btn-ghost" style="padding:5px 12px;font-size:12px" onclick="clearBulkSelection()">Cancel</button></div></div>
+    <div id="expAnalytics"></div>
     <div class="elist" id="expList"></div>
   </div>
 
@@ -598,7 +601,9 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <input type="text" id="fixName" placeholder="e.g. Rent, EMI, Netflix" style="flex:2">
       <input type="number" id="fixAmt" placeholder="₹ Amount" style="max-width:130px">
       <select id="fixFreq" style="max-width:110px"><option>Daily</option><option>Weekly</option><option>Monthly</option><option>Yearly</option></select>
-      <input type="number" id="fixDueDay" placeholder="Due day e.g.15" min="1" max="28" style="max-width:130px">
+      <input type="number" id="fixDueDay" placeholder="Due day 1-31" min="1" max="31" style="max-width:130px">
+      <select id="fixCat" style="max-width:120px"></select>
+      <select id="fixAccId" style="max-width:130px"></select>
       <label class="chkrow"><input type="checkbox" id="fixRecur" checked> Remind</label>
       <button class="btn" onclick="addFixed()">+ Add</button>
     </div>
@@ -1222,7 +1227,7 @@ function addExpense(){
   if(document.getElementById('expTags'))document.getElementById('expTags').value='';
   var recurEl=document.getElementById('expRecurring');
   if(recurEl&&recurEl.checked){
-    D.fixed.push({id:Date.now().toString()+'_fromexp',name:name,amt:amt,freq:'Monthly',recurring:true,dueDay:0});
+    D.fixed.push({id:Date.now().toString()+'_fromexp',name:name,amt:amt,freq:'Monthly',recurring:true,dueDay:0,cat:document.getElementById('expCat')?document.getElementById('expCat').value:'Utilities',accountId:document.getElementById('expAcc')?document.getElementById('expAcc').value:'',autoLog:true,skippedMonths:[]});
     recurEl.checked=false;
     showToast('Added '+name+' — '+fmt(amt)+' (also added to Fixed)','success');
   } else {
@@ -1387,6 +1392,11 @@ function openEditFixed(id){
   document.getElementById('efFreq').value=f.freq;
   document.getElementById('efDueDay').value=f.dueDay||'';
   document.getElementById('efRecur').checked=!!f.recurring;
+  if(document.getElementById('efAutoLog'))document.getElementById('efAutoLog').checked=f.autoLog!==false;
+  populateCatSelects();
+  var _efCat=document.getElementById('efCat');if(_efCat)_efCat.value=f.cat||'Utilities';
+  var _efAcc=document.getElementById('efAccId');
+  if(_efAcc)_efAcc.innerHTML=D.accounts.map(function(a){return '<option value="'+a.id+'"'+(a.id===f.accountId?' selected':'')+'>'+a.name+'</option>';}).join('');
   document.getElementById('editFixedModal').classList.add('show');
 }
 function closeEditFixed(){document.getElementById('editFixedModal').classList.remove('show');_editFixedId=null;}
@@ -1420,6 +1430,9 @@ function saveEditFixed(){
   f.autoLog=document.getElementById('efAutoLog')?document.getElementById('efAutoLog').checked:(f.autoLog!==false);
   f.cat=document.getElementById('efCat')?document.getElementById('efCat').value:(f.cat||'Utilities');
   f.accountId=document.getElementById('efAccId')?document.getElementById('efAccId').value:(f.accountId||'');
+  f.autoLog=document.getElementById('efAutoLog')?document.getElementById('efAutoLog').checked:(f.autoLog!==false);
+  var _efC=document.getElementById('efCat');if(_efC)f.cat=_efC.value;
+  var _efA=document.getElementById('efAccId');if(_efA)f.accountId=_efA.value;
   autoSave();closeEditFixed();renderFixed();recalc();
   showToast('Fixed expense updated','success');
 }
@@ -1514,6 +1527,7 @@ function removeFixed(id){
 }
 function togglePaid(id){var m=mk(),paid=D.paid[m]||[],idx=paid.indexOf(id);if(idx>-1)paid.splice(idx,1);else paid.push(id);D.paid[m]=paid;autoSave();renderFixed();checkReminders();}
 function renderFixed(){
+  renderFixedSummary();
   var rawArr=D.fixed.slice().filter(function(f){
     if(!_fixedSearch)return true;
     return f.name.toLowerCase().indexOf(_fixedSearch)>-1||(f.cat&&f.cat.toLowerCase().indexOf(_fixedSearch)>-1);
@@ -1544,7 +1558,7 @@ function renderFixed(){
   }).join('');
   var badge=document.getElementById('pendingBadge'),pend=rec.filter(function(f){return paid.indexOf(f.id)<0;}).length;badge.textContent=pend;badge.style.display=pend>0?'inline-block':'none';
 }
-function checkReminders(){var pending=D.fixed.filter(function(f){return f.recurring&&getPaid().indexOf(f.id)<0;});var today=new Date().getDate();var dueSoon=D.fixed.filter(function(f){return f.dueDay>0&&(f.dueDay===today||(f.dueDay-today>=1&&f.dueDay-today<=3));});var banner=document.getElementById('reminderBanner'),msgs=[];if(pending.length)msgs.push(pending.length+' recurring payment'+(pending.length>1?'s':'')+' pending');if(dueSoon.length)msgs.push(dueSoon.map(function(f){return f.name+(f.dueDay===today?' due TODAY':' due in '+(f.dueDay-today)+'d');}).join(', '));if(msgs.length){document.getElementById('reminderText').textContent='Warning: '+msgs.join(' / ');banner.classList.add('show');}else banner.classList.remove('show');}
+function checkReminders(){var _ckm=mk();var pending=D.fixed.filter(function(f){return f.recurring&&getPaid().indexOf(f.id)<0&&(!f.skippedMonths||f.skippedMonths.indexOf(_ckm)<0);});var today=new Date().getDate();var dueSoon=D.fixed.filter(function(f){return f.dueDay>0&&(f.dueDay===today||(f.dueDay-today>=1&&f.dueDay-today<=3));});var banner=document.getElementById('reminderBanner'),msgs=[];if(pending.length)msgs.push(pending.length+' recurring payment'+(pending.length>1?'s':'')+' pending');if(dueSoon.length)msgs.push(dueSoon.map(function(f){return f.name+(f.dueDay===today?' due TODAY':' due in '+(f.dueDay-today)+'d');}).join(', '));if(msgs.length){document.getElementById('reminderText').textContent='Warning: '+msgs.join(' / ');banner.classList.add('show');}else banner.classList.remove('show');}
 
 /* ═══ CALENDAR ═══ */
 function renderCalendar(){
@@ -1844,7 +1858,7 @@ function autoLogFixed(){
   if(!D.autoLogged)D.autoLogged=[];
   var m=mk();
   if(D.autoLogged.indexOf(m)>-1)return;
-  var monthly=D.fixed.filter(function(f){return f.freq==='Monthly'&&f.recurring;});
+  var monthly=D.fixed.filter(function(f){return f.freq==='Monthly'&&f.recurring&&f.autoLog!==false&&(!f.skippedMonths||f.skippedMonths.indexOf(m)<0);});
   if(!monthly.length){D.autoLogged.push(m);autoSave();return;}
   var count=0;
   monthly.forEach(function(f){var already=D.expenses.some(function(e){return e.month===m&&e.name===f.name&&e.amt===f.amt;});if(!already){var parts=m.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1,12,0,0).toISOString();D.expenses.push({id:Date.now().toString()+'_auto',date:ed,month:m,name:f.name,cat:f.cat||'Utilities',amt:f.amt,accountId:f.accountId||(D.accounts.length?D.accounts[0].id:''),note:'Auto-logged',tags:''});count++;}});
