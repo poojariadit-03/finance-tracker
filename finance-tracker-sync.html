@@ -523,7 +523,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div class="card-hd"><span class="ctitle">💰 Category budgets</span><div style="display:flex;gap:8px;align-items:center"><label style="font-size:12px;color:var(--tx2);display:flex;align-items:center;gap:5px"><input type="checkbox" id="budgetCarryover" onchange="D.config.budgetCarryover=this.checked;autoSave();renderBudgetBars();"> Carry over unused</label><button class="btn-ghost" onclick="toggleForm('budget-form')">+ Set budget</button></div></div>
     <div id="budget-form" style="display:none;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bdr)">
       <div class="irow">
-        <select id="budgetCat" style="max-width:150px"><option>Food</option><option>Transport</option><option>Shopping</option><option>Health</option><option>Entertainment</option><option>Utilities</option><option>Education</option><option>Other</option></select>
+        <select id="budgetCat" style="max-width:150px" onchange="updateBudgetHint()"></select>
         <input type="number" id="budgetAmt" placeholder="Monthly limit ₹" style="max-width:170px">
         <button class="btn" onclick="saveBudget()">Save</button>
         <button class="btn-ghost" onclick="clearBudget()">Clear selected</button>
@@ -535,7 +535,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div class="card-hd"><span class="ctitle">Log expense</span><button class="btn-ghost" onclick="exportCSV()">⬇ CSV</button></div>
     <div class="irow">
       <input type="text" id="expName" placeholder="e.g. Zomato dinner, Petrol for trip, Medicine - fever" style="flex:2;min-width:120px">
-      <select id="expCat" style="min-width:110px"><option>Food</option><option>Transport</option><option>Shopping</option><option>Health</option><option>Entertainment</option><option>Utilities</option><option>Education</option><option>Other</option></select>
+      <select id="expCat" style="min-width:110px"></select>
       <select id="expAcc" style="min-width:120px"></select>
       <input type="number" id="expAmt" placeholder="₹ Amount" min="0" step="1" style="max-width:120px">
       <input type="date" id="expDate" style="max-width:145px">
@@ -556,10 +556,11 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       </div>
       <div class="range-result" id="rangeResult" style="display:none"></div>
     </div>
-    <div class="qfilter" id="qfilterRow">
+    <div class="qfilter" id="qfilterRow" style="margin-top:10px">
       <button class="qpill active" onclick="setQFilter('all',this)">All</button>
       <button class="qpill" onclick="setQFilter('today',this)">Today</button>
       <button class="qpill" onclick="setQFilter('week',this)">This week</button>
+      <button class="qpill" id="reimbPill" onclick="setQFilter('reimb',this)">💰 Reimbursable</button>
     </div>
     <div class="srch-wrap"><span class="srch-ico">&#128269;</span><input type="text" id="expSearch" placeholder="Search expenses…" oninput="searchExpenses(this.value)" style="width:100%"></div>
     <div class="elist" id="expList"></div>
@@ -873,7 +874,15 @@ function getPaid(d){return D.paid[mk(d)]||[];}
 function fixedMonthly(){return D.fixed.reduce(function(s,f){if(f.freq==='Daily')return s+f.amt*30;if(f.freq==='Weekly')return s+f.amt*4.33;if(f.freq==='Yearly')return s+f.amt/12;return s+f.amt;},0);}
 
 /* ═══ TABS / NAV ═══ */
-function changeMonth(dir){curDate=new Date(curDate.getFullYear(),curDate.getMonth()+dir,1);selDay=null;_qFilterMode='all';var pills=document.querySelectorAll('.qpill');if(pills.length){pills.forEach(function(p){p.classList.remove('active');});pills[0].classList.add('active');}updateHeader();renderAll();}
+function changeMonth(dir){
+  /* Reset quick filter and date range when switching months */
+  _qFilterMode='all';
+  _rangeFrom=null;_rangeTo=null;
+  var rf=document.getElementById('rangeFrom');if(rf)rf.value='';
+  var rt=document.getElementById('rangeTo');if(rt)rt.value='';
+  var rr=document.getElementById('rangeResult');if(rr)rr.style.display='none';
+  document.querySelectorAll('.qpill').forEach(function(p){p.classList.remove('active');});
+  var first=document.querySelector('.qpill');if(first)first.classList.add('active');curDate=new Date(curDate.getFullYear(),curDate.getMonth()+dir,1);selDay=null;_qFilterMode='all';var pills=document.querySelectorAll('.qpill');if(pills.length){pills.forEach(function(p){p.classList.remove('active');});pills[0].classList.add('active');}updateHeader();renderAll();}
 function updateHeader(){document.getElementById('monthLabel').textContent=curDate.toLocaleString('default',{month:'short',year:'numeric'});}
 function switchTab(n){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===n);});
@@ -1176,16 +1185,82 @@ function addExpense(){
   autoSave();
   document.getElementById('expName').value='';document.getElementById('expAmt').value='';
   document.getElementById('expDate').value=todayStr();
+  document.getElementById('expDate').value=todayStr();
   if(document.getElementById('expNote'))document.getElementById('expNote').value='';
   if(document.getElementById('expTags'))document.getElementById('expTags').value='';
+  var recurEl=document.getElementById('expRecurring');
+  if(recurEl&&recurEl.checked){
+    D.fixed.push({id:Date.now().toString()+'_fromexp',name:name,amt:amt,freq:'Monthly',recurring:true,dueDay:0});
+    recurEl.checked=false;
+    showToast('Added '+name+' — '+fmt(amt)+' (also added to Fixed)','success');
+  } else {
+    showToast('Added '+name+' — '+fmt(amt),'success');
+  }
   renderExpenses();recalc();renderAccounts();
-  showToast('Added '+name+' — '+fmt(amt),'success');
 }
 
-function removeExpense(id){D.expenses=D.expenses.filter(function(e){return e.id!==id;});autoSave();renderExpenses();recalc();renderAccounts();}
+
+/* ═══ EXPENSE ANALYTICS ═══ */
+function renderExpenseAnalytics(arr){
+  var el=document.getElementById('expAnalytics');if(!el||!arr)return;
+  if(!arr.length){el.innerHTML='';return;}
+  var total=arr.reduce(function(s,e){return s+e.amt;},0);
+  var avg=total/arr.length;
+  var max=arr.reduce(function(a,e){return e.amt>a.amt?e:a;},arr[0]);
+  var cats={};arr.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
+  var topCat=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];})[0]||'—';
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 0;border-top:1px solid var(--bdr);margin-top:4px">'
+    +'<div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:3px">Total</div><div style="font-family:monospace;font-size:14px;font-weight:600">'+fmt(total)+'</div></div>'
+    +'<div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:3px">Average</div><div style="font-family:monospace;font-size:14px">'+fmt(Math.round(avg))+'</div></div>'
+    +'<div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:3px">Highest</div><div style="font-family:monospace;font-size:14px;color:var(--red)">'+fmt(max.amt)+'</div><div style="font-size:10px;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+max.name+'</div></div>'
+    +'<div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:3px">Top cat</div><div style="font-size:13px;font-weight:600">'+topCat+'</div><div style="font-size:10px;color:var(--tx3)">'+arr.length+' entries</div></div>'
+    +'</div>';
+}
+
+
+var _expSort='date-desc';
+function setExpSort(mode,btn){
+  _expSort=mode;
+  document.querySelectorAll('.sort-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  renderExpenses(document.getElementById('expSearch').value||undefined);
+}
+
+
+/* ═══ BULK DELETE ═══ */
+var _bulkSelected=new Set();
+function toggleBulkSelect(id,cb){
+  if(cb.checked)_bulkSelected.add(id);
+  else _bulkSelected.delete(id);
+  updateBulkBar();
+}
+function updateBulkBar(){
+  var bar=document.getElementById('bulkBar'),cnt=document.getElementById('bulkCount');
+  if(_bulkSelected.size>0){bar.classList.add('show');if(cnt)cnt.textContent=_bulkSelected.size+' selected';}
+  else bar.classList.remove('show');
+}
+function clearBulkSelection(){
+  _bulkSelected.clear();
+  document.querySelectorAll('.exp-check').forEach(function(cb){cb.checked=false;});
+  updateBulkBar();
+}
+function bulkDelete(){
+  if(!_bulkSelected.size)return;
+  if(!confirm('Delete '+_bulkSelected.size+' expense'+(  _bulkSelected.size>1?'s':''  )+'?'))return;
+  D.expenses=D.expenses.filter(function(e){return !_bulkSelected.has(e.id);});
+  _bulkSelected.clear();
+  autoSave();renderExpenses();recalc();renderAccounts();updateBulkBar();
+  showToast('Deleted expenses','success');
+}
+
+function removeExpense(id){
+  if(!confirm('Delete this expense?'))return;
+  D.expenses=D.expenses.filter(function(e){return e.id!==id;});
+  autoSave();renderExpenses();recalc();renderAccounts();
+}
 function renderExpenses(textFilter,dateFilter){
   if(typeof _rangeFrom!=='undefined'&&(_rangeFrom||_rangeTo)){renderExpensesRange();return;}
-  var arr=getExpenses(),accs=D.accounts,el=document.getElementById('expList');
+  var arr=(typeof _qFilterMode!=='undefined'&&_qFilterMode==='reimb')?D.expenses:getExpenses(),accs=D.accounts,el=document.getElementById('expList');
   if(textFilter){var q=textFilter.toLowerCase();arr=arr.filter(function(e){return e.name.toLowerCase().indexOf(q)>-1||e.cat.toLowerCase().indexOf(q)>-1||(e.note&&e.note.toLowerCase().indexOf(q)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(q)>-1);});}
   if(dateFilter){arr=arr.filter(function(e){return new Date(e.date).toISOString().slice(0,10)===dateFilter;});}
   /* Quick filter */
@@ -1196,6 +1271,7 @@ function renderExpenses(textFilter,dateFilter){
       var d=new Date(e.date);
       if(_qFilterMode==='today')return d.getDate()===_now.getDate()&&d.getMonth()===_now.getMonth()&&d.getFullYear()===_now.getFullYear();
       if(_qFilterMode==='week')return d>=_wkS&&d<=_now;
+      if(_qFilterMode==='reimb')return (e.tags&&(e.tags.toLowerCase().indexOf('#reimbursable')>-1||e.tags.toLowerCase().indexOf('reimbursable')>-1))||(e.note&&e.note.toLowerCase().indexOf('reimbursable')>-1);
       return true;
     });
   }
@@ -1205,12 +1281,13 @@ function renderExpenses(textFilter,dateFilter){
   }
   el.innerHTML=arr.slice().reverse().map(function(e){var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{month:'short',day:'numeric'}),acc=accs.find(function(a){return a.id===e.accountId;});var tagHtml='';if(e.tags){e.tags.split(' ').filter(Boolean).forEach(function(t){tagHtml+='<span style="display:inline-block;background:var(--bbg,#E6F1FB);color:var(--blue,#185FA5);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:3px">'+t+'</span>';});}
     var noteHtml=e.note?'<div style="font-size:11px;color:var(--tx3);font-style:italic">📝 '+e.note+'</div>':'';
-    return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span><button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="del-btn" onclick="removeExpense(\''+e.id+'\')">×</button></div></div>';}).join('');
+    return '<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span><button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="del-btn" onclick="removeExpense(\''+e.id+'\')">×</button></div></div>';}).join('');
   renderBudgetBars();checkBudgetAlerts();
 }
 
 var _qFilterMode='all';
 function setQFilter(mode,btn){
+  if(mode==='reimb'){_qFilterMode='reimb';document.querySelectorAll('.qpill').forEach(function(p){p.classList.remove('active');});if(btn)btn.classList.add('active');renderExpenses(document.getElementById('expSearch').value||undefined);return;}
   _qFilterMode=mode;
   document.querySelectorAll('.qpill').forEach(function(p){p.classList.remove('active');});
   btn.classList.add('active');
@@ -1222,6 +1299,15 @@ function clearExpFilter(){document.getElementById('expDateFilter').value='';docu
 function searchExpenses(q){renderExpenses(q);}
 
 /* ═══ BUDGETS ═══ */
+
+function updateBudgetHint(){
+  var cat=document.getElementById('budgetCat').value;
+  var hint=document.getElementById('budgetHint');
+  if(!hint)return;
+  var current=D.budgets[cat];
+  hint.textContent=current?'Current limit: '+fmt(current):'No limit set for this category';
+}
+
 function saveBudget(){var cat=document.getElementById('budgetCat').value,amt=parseFloat(document.getElementById('budgetAmt').value);if(!cat||isNaN(amt)||amt<0)return;if(amt===0)delete D.budgets[cat];else D.budgets[cat]=amt;autoSave();document.getElementById('budgetAmt').value='';renderBudgetBars();checkBudgetAlerts();}
 function clearBudget(){delete D.budgets[document.getElementById('budgetCat').value];autoSave();renderBudgetBars();checkBudgetAlerts();}
 function renderBudgetBars(){
@@ -1238,7 +1324,17 @@ function renderBudgetBars(){
       carryover[cat]=unused;
     });
   }
-  el.innerHTML=cats.map(function(cat){var baseLimit=budgets[cat],carry=carryover[cat]||0,limit=baseLimit+carry,used=spent[cat]||0,pct=Math.min(100,used/limit*100),over=used>limit,barCol=pct<60?'var(--green)':pct<85?'var(--amber)':'var(--red)',catCol=getCatColor(cat);var pill=over?'<span style="background:var(--rbg);color:var(--red);font-size:10px;font-weight:600;padding:1px 8px;border-radius:99px;margin-left:6px">OVER</span>':pct>=85?'<span style="background:var(--abg);color:var(--amber);font-size:10px;font-weight:600;padding:1px 8px;border-radius:99px;margin-left:6px">NEAR LIMIT</span>':'';return '<div style="margin-bottom:13px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="display:flex;align-items:center;font-size:13px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:'+catCol+';display:inline-block;margin-right:6px"></span>'+cat+pill+'</span><span style="font-size:12px;font-family:\'DM Mono\',monospace">'+fmt(used)+' / '+fmt(limit)+'</span></div><div class="pbg" style="height:8px"><div class="pfill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+'"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;margin-top:3px"><span style="color:'+(over?'var(--red)':pct>=85?'var(--amber)':'var(--tx3)')+'">'+( over?'Over by '+fmt(used-limit):fmt(Math.max(0,limit-used))+' left')+'</span><span style="color:var(--tx3)">'+pct.toFixed(0)+'% used</span></div></div>';}).join('');
+  /* Budget summary header */
+  var spent2={};getExpenses().forEach(function(e){spent2[e.cat]=(spent2[e.cat]||0)+e.amt;});
+  var totalBudgeted=cats.reduce(function(s,c){return s+(budgets[c]||0);},0);
+  var totalUsed=cats.reduce(function(s,c){return s+(spent2[c]||0);},0);
+  var summaryHtml='';
+  if(cats.length>1){
+    var overallPct=totalBudgeted>0?Math.min(100,totalUsed/totalBudgeted*100):0;
+    var ovCol=overallPct>=80?'var(--red)':overallPct>=60?'var(--amber)':'var(--green)';
+    summaryHtml='<div style="background:var(--sur2);border-radius:8px;padding:8px 10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:600;color:var(--tx2)">All budgets</span><span style="font-family:monospace;font-size:12px;color:'+ovCol+'">'+fmt(totalUsed)+' / '+fmt(totalBudgeted)+' ('+overallPct.toFixed(0)+'%)</span></div>';
+  }
+  el.innerHTML=summaryHtml+cats.map(function(cat){var baseLimit=budgets[cat],carry=carryover[cat]||0,limit=baseLimit+carry,used=spent[cat]||0,pct=Math.min(100,used/limit*100),over=used>limit,barCol=pct<60?'var(--green)':pct<85?'var(--amber)':'var(--red)',catCol=getCatColor(cat);var pill=over?'<span style="background:var(--rbg);color:var(--red);font-size:10px;font-weight:600;padding:1px 8px;border-radius:99px;margin-left:6px">OVER</span>':pct>=85?'<span style="background:var(--abg);color:var(--amber);font-size:10px;font-weight:600;padding:1px 8px;border-radius:99px;margin-left:6px">NEAR LIMIT</span>':'';return '<div style="margin-bottom:13px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="display:flex;align-items:center;font-size:13px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:'+catCol+';display:inline-block;margin-right:6px"></span>'+cat+pill+'</span><span style="font-size:12px;font-family:\'DM Mono\',monospace">'+fmt(used)+' / '+fmt(limit)+'</span></div><div class="pbg" style="height:8px"><div class="pfill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+'"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;margin-top:3px"><span style="color:'+(over?'var(--red)':pct>=85?'var(--amber)':'var(--tx3)')+'">'+( over?'Over by '+fmt(used-limit):fmt(Math.max(0,limit-used))+' left')+'</span><span style="color:var(--tx3)">'+pct.toFixed(0)+'% used</span></div></div>';}).join('');
 }
 function checkBudgetAlerts(){var cats=Object.keys(D.budgets),badge=document.getElementById('budgetBadge');if(!cats.length){badge.style.display='none';return;}var spent={};getExpenses().forEach(function(e){spent[e.cat]=(spent[e.cat]||0)+e.amt;});var over=cats.filter(function(c){return (spent[c]||0)>D.budgets[c];});var near=cats.filter(function(c){var u=spent[c]||0;return u<=D.budgets[c]&&u/D.budgets[c]>=0.85;});if(over.length){badge.textContent=over.length;badge.style.display='inline-block';badge.style.background='var(--red)';}else if(near.length){badge.textContent='!';badge.style.display='inline-block';badge.style.background='var(--amber)';}else badge.style.display='none';}
 
@@ -1540,7 +1636,16 @@ function exportExcel(months){
     XLSX.writeFile(wb,'finance-tracker-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
-function exportCSV(){var arr=getExpenses(),accs=D.accounts;if(!arr.length){showToast('No expenses this month!','error');return;}var rows=[['Date','Description','Category','Account','Amount (₹)','Note','Tags']];arr.forEach(function(e){var acc=accs.find(function(a){return a.id===e.accountId;});rows.push([new Date(e.date).toLocaleDateString('en-IN'),e.name,e.cat,acc?acc.name:'',e.amt.toFixed(2),e.note||'',e.tags||'']);});var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows.map(function(r){return r.join(',');}).join('\n'));a.download='expenses-'+mk()+'.csv';a.click();}
+function exportCSV(){
+  var arr;
+  if(typeof _rangeFrom!=='undefined'&&(_rangeFrom||_rangeTo)){
+    var from=_rangeFrom?new Date(_rangeFrom+'T00:00:00'):null;
+    var to=_rangeTo?new Date(_rangeTo+'T23:59:59'):null;
+    arr=D.expenses.filter(function(e){var d=new Date(e.date);if(from&&d<from)return false;if(to&&d>to)return false;return true;});
+  } else {
+    arr=getExpenses();
+  }
+  var accs=D.accounts;if(!arr.length){showToast('No expenses this month!','error');return;}var rows=[['Date','Description','Category','Account','Amount (₹)','Note','Tags']];arr.forEach(function(e){var acc=accs.find(function(a){return a.id===e.accountId;});rows.push([new Date(e.date).toLocaleDateString('en-IN'),e.name,e.cat,acc?acc.name:'',e.amt.toFixed(2),e.note||'',e.tags||'']);});var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows.map(function(r){return r.join(',');}).join('\n'));a.download='expenses-'+mk()+'.csv';a.click();}
 
 /* ═══ INIT ═══ */
 /* -- WEEKLY SUMMARY -- */
@@ -1567,7 +1672,7 @@ function renderWeeklySummary(){
   h+='<div class="wk-box"><div class="wk-label">Change</div><div class="wk-val" style="color:'+dCol+'">'+dSgn+fmt(diff)+(pct?' ('+dSgn+pct+'%)':'')+'</div></div>';
   h+='<div class="wk-box"><div class="wk-label">Top category</div><div class="wk-val" style="font-size:14px;font-weight:600">'+topC+(cats[topC]?' '+fmt(cats[topC]):'')+'</div></div>';
   h+='</div>';
-  if(tExp.length){h+='<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:8px">Expenses this week</div>';h+=tExp.slice().reverse().slice(0,8).map(function(e){var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{weekday:'short',day:'numeric'});return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div><div class="ename">'+e.name+'</div><div class="emeta">'+d+' '+e.cat+'</div></div></div><span class="eamt">'+fmt(e.amt)+'</span></div>';}).join('');}
+  if(tExp.length){h+='<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:8px">Expenses this week</div>';h+=tExp.slice().reverse().slice(0,8).map(function(e){var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{weekday:'short',day:'numeric'});return '<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div><div class="ename">'+e.name+'</div><div class="emeta">'+d+' '+e.cat+'</div></div></div><span class="eamt">'+fmt(e.amt)+'</span></div>';}).join('');}
   else h+='<p class="empty">No expenses this week yet.</p>';
   document.getElementById('weeklySummary').innerHTML=h;
 }
@@ -1588,6 +1693,7 @@ var editingId=null;
 function openEdit(id){
   var e=D.expenses.find(function(e){return e.id===id;});if(!e)return;
   editingId=id;
+  populateCatSelects(); /* refresh cats including any new custom ones */
   document.getElementById('editName').value=e.name;
   document.getElementById('editCat').value=e.cat;
   document.getElementById('editAmt').value=e.amt;
@@ -2178,7 +2284,7 @@ function renderExpensesRange(){
     var id=e.id;
     var tagHtml='';if(e.tags){e.tags.split(' ').filter(Boolean).forEach(function(t){tagHtml+='<span style="display:inline-block;background:var(--bbg,#E6F1FB);color:var(--blue);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:3px">'+t+'</span>';});}
     var noteHtml=e.note?'<div style="font-size:11px;color:var(--tx3);font-style:italic">'+e.note+'</div>':'';
-    var row='<div class="erow"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span>';
+    var row='<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span>';
     row+='<button class="edit-btn" onclick="openEdit(this.dataset.id)" data-id="'+id+'">Edit</button>';
     row+='<button class="del-btn" onclick="removeExpense(this.dataset.id)" data-id="'+id+'">x</button>';
     row+='</div></div>';
@@ -2202,9 +2308,9 @@ function renderSavingsComparison(){
   var totalSav=data.reduce(function(s,d){return s+d.savAmt;},0);
   var metCount=data.filter(function(d){return d.metGoal;}).length;
   var bars=data.map(function(d){var h=Math.round(d.savAmt/maxSav*120),gH=Math.round(d.savGoal/maxSav*120);var col=d.metGoal?'var(--green)':d.savAmt>0?'var(--amber)':'var(--bdr)';var p=d.label.split('|');return '<div class="sav-bar-wrap"><div class="sav-bar-amt" style="color:'+col+';font-size:8px">'+(d.savAmt>0?fmt(d.savAmt):'--')+'</div><div class="sav-bar-outer" style="height:120px"><div class="sav-bar-inner" style="height:'+h+'px;background:'+col+'"></div>'+(d.savGoal>0?'<div class="sav-bar-goal" style="bottom:'+gH+'px"></div>':'')+'</div><div class="sav-bar-label">'+p[0]+'<br>&#39;'+p[1]+'</div></div>';}).join('');
-  var html='<div class="sav-bars">'+bars+'</div><div class="sav-stats-row"><div class="sav-stat"><div class="sav-stat-label">Total saved</div><div class="sav-stat-val" style="color:var(--green)">'+fmt(totalSav)+'</div></div><div class="sav-stat"><div class="sav-stat-label">Avg/month</div><div class="sav-stat-val">'+fmt(Math.round(avgSav))+'</div></div><div class="sav-stat"><div class="sav-stat-label">Best month</div><div class="sav-stat-val" style="color:var(--green)">'+fmt(best.savAmt)+'<div style="font-size:10px;color:var(--tx3)">'+best.label.replace('|'," '")+'</div></div></div><div class="sav-stat"><div class="sav-stat-label">Goal met</div><div class="sav-stat-val" style="color:'+(metCount===n?'var(--green)':'var(--amber)')+'">'+metCount+'/'+n+'</div></div></div>';
+  var html='<div class="sav-bars">'+bars+'</div><div class="sav-stats-row"><div class="sav-stat"><div class="sav-stat-label">Total saved</div><div class="sav-stat-val" style="color:var(--green)">'+fmt(totalSav)+'</div></div><div class="sav-stat"><div class="sav-stat-label">Avg/month</div><div class="sav-stat-val">'+fmt(Math.round(avgSav))+'</div></div><div class="sav-stat"><div class="sav-stat-label">Best month</div><div class="sav-stat-val" style="color:var(--green)">'+fmt(best.savAmt)+'<div style="font-size:10px;color:var(--tx3)">'+best.label.replace('|',' ')+'</div></div></div><div class="sav-stat"><div class="sav-stat-label">Goal met</div><div class="sav-stat-val" style="color:'+(metCount===n?'var(--green)':'var(--amber)')+'">'+metCount+'/'+n+'</div></div></div>';
   html+='<div style="overflow-x:auto;margin-top:12px"><table class="htable"><thead><tr><th>Month</th><th>Income</th><th>Saved</th><th>Rate</th><th>Goal</th><th>Status</th></tr></thead><tbody>';
-  data.slice().reverse().forEach(function(d){var rc=d.savRate>=(savGoalPct*100)?'var(--green)':d.savRate>0?'var(--amber)':'var(--red)';html+='<tr><td>'+d.label.replace('|'," '")+'</td><td>'+fmt(d.income)+'</td><td style="color:var(--green)">'+fmt(d.savAmt)+'</td><td style="color:'+rc+'">'+d.savRate.toFixed(1)+'%</td><td>'+fmt(d.savGoal)+'</td><td>'+(d.income===0?'--':d.metGoal?'<span style="color:var(--green)">Met</span>':'<span style="color:var(--amber)">Below</span>')+'</td></tr>';});
+  data.slice().reverse().forEach(function(d){var rc=d.savRate>=(savGoalPct*100)?'var(--green)':d.savRate>0?'var(--amber)':'var(--red)';html+='<tr><td>'+d.label.replace('|',' ')+'</td><td>'+fmt(d.income)+'</td><td style="color:var(--green)">'+fmt(d.savAmt)+'</td><td style="color:'+rc+'">'+d.savRate.toFixed(1)+'%</td><td>'+fmt(d.savGoal)+'</td><td>'+(d.income===0?'--':d.metGoal?'<span style="color:var(--green)">Met</span>':'<span style="color:var(--amber)">Below</span>')+'</td></tr>';});
   el.innerHTML=html+'</tbody></table></div>';
 }
 
