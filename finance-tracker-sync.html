@@ -575,12 +575,17 @@ function doGlobalSearch(q){
   clearTimeout(_gsTimer);
   _gsTimer=setTimeout(function(){
     var qq=q.toLowerCase();
-    var results=D.expenses.filter(function(e){
+    var expResults=D.expenses.filter(function(e){
       return e.name.toLowerCase().indexOf(qq)>-1||e.cat.toLowerCase().indexOf(qq)>-1||(e.note&&e.note.toLowerCase().indexOf(qq)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(qq)>-1);
-    }).slice().reverse().slice(0,20);
+    });
+    var incResults=(D.extraIncome||[]).filter(function(e){
+      return e.name.toLowerCase().indexOf(qq)>-1||(e.source&&e.source.toLowerCase().indexOf(qq)>-1);
+    }).map(function(e){return {id:e.id,name:e.name,cat:e.source||'Income',amt:e.amt,date:e.date,month:e.month,_isIncome:true};});
+    var results=expResults.concat(incResults).slice().reverse().slice(0,20);
     if(!results.length){el.innerHTML='<div class="gsr-item" style="color:var(--tx3)">No results</div>';el.classList.add('show');return;}
     el.innerHTML=results.map(function(e){
       var d=new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+      var icon=e._isIncome?'<span style="color:var(--green);font-size:11px;margin-right:4px">+</span>':'';
       return '<div class="gsr-item" onclick="jumpToExpense(\''+e.month+'\')"><div><div class="gsr-name">'+e.name+'</div><div class="gsr-meta">'+d+' · '+e.cat+'</div></div><span style="font-family:\'DM Mono\',monospace;font-size:13px;font-weight:500;flex-shrink:0">'+fmt(e.amt)+'</span></div>';
     }).join('');
     el.classList.add('show');
@@ -842,7 +847,7 @@ function renderCustomCategories(){
 function populateCatSelects(){
   var cats=getAllCategories();
   var opts=cats.map(function(c){return '<option>'+c.name+'</option>';}).join('');
-  ['expCat','budgetCat','editCat'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=opts;});
+  ['expCat','budgetCat','editCat'].forEach(function(id){var el=document.getElementById(id);if(el){var prev=el.value;el.innerHTML=opts;if(prev)el.value=prev;}});
 }
 
 function addExpense(){
@@ -1052,14 +1057,16 @@ function renderNetWorth(){
   var fdTotal=D.fds.reduce(function(s,fd){var el=Math.min(mElapsed(fd.start),fd.tenure);return s+calcFD(fd.amt,fd.rate,el);},0);
   var rdTotal=D.rds.reduce(function(s,rd){var el=Math.min(mElapsed(rd.start),rd.tenure);return s+(el>0?calcRD(rd.amt,rd.rate,el):0);},0);
   var goalTotal=D.goals.reduce(function(s,g){return s+(g.contributions||[]).reduce(function(t,c){return t+c.amount;},0);},0);
-  var totalAssets=accTotal+fdTotal+rdTotal+goalTotal;
+  /* Pending lent amounts are assets — money owed to you */
+  var pendingLent=(D.lent||[]).filter(function(l){return !l.returned;}).reduce(function(s,l){return s+l.amt;},0);
+  var totalAssets=accTotal+fdTotal+rdTotal+goalTotal+pendingLent;
   var liabilities=D.liabilities||[];
   var totalLiab=liabilities.reduce(function(s,l){return s+l.amt;},0);
   var netWorth=totalAssets-totalLiab;
   document.getElementById('nw-assets').textContent=fmt(totalAssets);
   document.getElementById('nw-liab').textContent=fmt(totalLiab);
   var nwEl=document.getElementById('nw-total');nwEl.textContent=fmt(netWorth);nwEl.className='mval '+(netWorth>=0?'green':'red');
-  var assetRows=[{l:'Account balances',v:accTotal,icon:'🏦'},{l:'FDs (current value)',v:fdTotal,icon:'📈'},{l:'RDs (current value)',v:rdTotal,icon:'🔄'},{l:'Goal savings',v:goalTotal,icon:'🎯'}];
+  var assetRows=[{l:'Account balances',v:accTotal,icon:'🏦'},{l:'FDs (current value)',v:fdTotal,icon:'📈'},{l:'RDs (current value)',v:rdTotal,icon:'🔄'},{l:'Goal savings',v:goalTotal,icon:'🎯'},{l:'Pending lent (owed to you)',v:pendingLent,icon:'💸'}];
   document.getElementById('nw-assets-list').innerHTML=assetRows.filter(function(r){return r.v>0;}).map(function(r){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px"><span>'+r.icon+' '+r.l+'</span><span style="font-family:\'DM Mono\',monospace;font-weight:500;color:var(--green)">'+fmt(r.v)+'</span></div>';}).join('')||'<p class="empty">No assets found.</p>';
   var liabEl=document.getElementById('nw-liab-list');
   if(!liabilities.length){liabEl.innerHTML='<p class="empty">No liabilities yet.</p>';return;}
@@ -1175,7 +1182,13 @@ function exportExcel(months){
   D.goals.forEach(function(g){var sv=(g.contributions||[]).reduce(function(s,c){return s+c.amount;},0);gl.push([g.emoji+' '+g.name,g.target,Math.round(sv),Math.round(Math.max(0,g.target-sv)),(Math.min(100,sv/g.target*100)).toFixed(1)+'%',g.deadline||'—']);});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(gl),'Goals');
 
-  XLSX.writeFile(wb,'finance-tracker-'+new Date().toISOString().slice(0,10)+'.xlsx');
+
+  /* ── Lent Sheet ── */
+  var lt=[['Person','Amount','Date Lent','Return By','Status','Returned Date','Note']];
+  (D.lent||[]).forEach(function(l){lt.push([l.name,l.amt,l.date,l.returnBy||'—',l.returned?'Returned':'Pending',l.returnedDate||'—',l.note||'']);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(lt),'Lent Money');
+
+    XLSX.writeFile(wb,'finance-tracker-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 function exportCSV(){var arr=getExpenses(),accs=D.accounts;if(!arr.length){showToast('No expenses this month!','error');return;}var rows=[['Date','Description','Category','Account','Amount (₹)','Note','Tags']];arr.forEach(function(e){var acc=accs.find(function(a){return a.id===e.accountId;});rows.push([new Date(e.date).toLocaleDateString('en-IN'),e.name,e.cat,acc?acc.name:'',e.amt.toFixed(2),e.note||'',e.tags||'']);});var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows.map(function(r){return r.join(',');}).join('\n'));a.download='expenses-'+mk()+'.csv';a.click();}
@@ -1466,7 +1479,8 @@ function renderAll(){
   applyTheme(D.config.theme||'auto');applyFontSize(D.config.fontSize||'normal');updateLentBadge();
   var incDt=document.getElementById('incDate');if(incDt)incDt.value=todayStr();
   if(D.config&&D.config.dailyLimit){var dli=document.getElementById('dailyLimitInput');if(dli)dli.value=D.config.dailyLimit;}
-  var lentDt=document.getElementById('lentDate');if(lentDt)lentDt.value=todayStr();
+  var lentDt=document.getElementById('lentDate');if(lentDt&&!lentDt.value)lentDt.value=todayStr();
+  var lentRetDt=document.getElementById('lentReturnBy');  /* ensure return-by stays blank */
 }
 
 /* ═══ AUTO-LOAD ═══ */
