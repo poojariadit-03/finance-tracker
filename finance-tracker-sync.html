@@ -1435,7 +1435,9 @@ function checkBudgetAlerts(){var cats=Object.keys(D.budgets),badge=document.getE
 
 /* ═══ FIXED ═══ */
 function addFixed(){
-  var name=document.getElementById('fixName').value.trim(),amt=parseFloat(document.getElementById('fixAmt').value),freq=document.getElementById('fixFreq').value,recurring=document.getElementById('fixRecur').checked,dueDay=parseInt(document.getElementById('fixDueDay').value)||0;
+  var name=document.getElementById('fixName').value.trim(),amt=parseFloat(document.getElementById('fixAmt').value),freq=document.getElementById('fixFreq').value,recurring=document.getElementById('fixRecur').checked;
+  var _fixDueDateVal=document.getElementById('fixDueDay').value;
+  var dueDay=_fixDueDateVal?new Date(_fixDueDateVal+'T12:00:00').getDate():0;
   var cat=document.getElementById('fixCat')?document.getElementById('fixCat').value:'Utilities';
   var accountId=document.getElementById('fixAccId')?document.getElementById('fixAccId').value:'';
   if(!name||isNaN(amt)||amt<=0)return;
