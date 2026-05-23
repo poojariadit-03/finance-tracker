@@ -1450,7 +1450,11 @@ function openEditFixed(id){
   document.getElementById('efName').value=f.name;
   document.getElementById('efAmt').value=f.amt;
   document.getElementById('efFreq').value=f.freq;
-  document.getElementById('efDueDay').value=f.dueDay||'';
+  var _efDayVal='';
+  if(f.dueDay>0){var _n2=new Date();_efDayVal=_n2.getFullYear()+'-'+String(_n2.getMonth()+1).padStart(2,'0')+'-'+String(f.dueDay).padStart(2,'0');}
+  document.getElementById('efDueDay').value=_efDayVal;
+  var _efAcc2=document.getElementById('efAccId');
+  if(_efAcc2)_efAcc2.innerHTML=D.accounts.map(function(a){return '<option value="'+a.id+'"'+(a.id===f.accountId?' selected':'')+'>'+a.name+'</option>';}).join('');
   document.getElementById('efRecur').checked=!!f.recurring;
   if(document.getElementById('efAutoLog'))document.getElementById('efAutoLog').checked=f.autoLog!==false;
   populateCatSelects();
@@ -1485,7 +1489,8 @@ function saveEditFixed(){
   f.name=document.getElementById('efName').value.trim()||f.name;
   f.amt=parseFloat(document.getElementById('efAmt').value)||f.amt;
   f.freq=document.getElementById('efFreq').value;
-  f.dueDay=parseInt(document.getElementById('efDueDay').value)||0;
+  var _efDueDateVal=document.getElementById('efDueDay').value;
+  f.dueDay=_efDueDateVal?new Date(_efDueDateVal+'T12:00:00').getDate():0;
   f.recurring=document.getElementById('efRecur').checked;
   f.autoLog=document.getElementById('efAutoLog')?document.getElementById('efAutoLog').checked:(f.autoLog!==false);
   f.cat=document.getElementById('efCat')?document.getElementById('efCat').value:(f.cat||'Utilities');
@@ -1610,7 +1615,13 @@ function renderFixed(){
     var isPaid=paid.indexOf(f.id)>-1,mo=f.freq==='Daily'?f.amt*30:f.freq==='Weekly'?f.amt*4.33:f.freq==='Yearly'?f.amt/12:f.amt;
     var note=f.freq!=='Monthly'?' (approx '+fmt(mo)+'/mo)':'';
     var duePill='';
-    if(f.dueDay>0){var diff=f.dueDay-today;if(diff===0)duePill=' <span class="bill-due">Due TODAY</span>';else if(diff>=1&&diff<=3)duePill=' <span class="bill-soon">Due in '+diff+'d</span>';else if(diff<0&&diff>=-2)duePill=' <span class="bill-due">Overdue</span>';else duePill=' <span style="font-size:10px;color:var(--tx3);margin-left:4px">Due '+f.dueDay+'th</span>';}
+    if(f.dueDay>0){var diff=f.dueDay-today;
+      if(isPaid){duePill=' <span style="font-size:10px;color:var(--green);margin-left:4px">✓ Due '+f.dueDay+'th</span>';}
+      else if(diff>3){duePill=' <span style="font-size:10px;color:var(--tx3);margin-left:4px">Due '+f.dueDay+'th</span>';}
+      else if(diff>=1&&diff<=3){duePill=' <span class="bill-soon">Due in '+diff+'d</span>';}
+      else if(diff===0){duePill=' <span class="bill-due">Due TODAY</span>';}
+      else{duePill=' <span class="bill-due">Overdue ('+f.dueDay+'th)</span>';}
+    }
     var catTag=f.cat?'<span style="display:inline-block;background:var(--sur2);color:var(--tx3);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:5px">'+f.cat+'</span>':'';
     var skipLabel=f.skippedMonths&&f.skippedMonths.indexOf(mk())>-1?'Unskip':'Skip';
     var autoLabel=(f.autoLog===false)?'⏸':'▶';
@@ -2465,6 +2476,32 @@ function renderTemplates(){
   el.innerHTML=tpls.map(function(t){
     return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+getCatColor(t.cat)+'"></div><div><div class="ename">'+t.name+'</div><div class="emeta">'+t.cat+(t.amt?' · '+fmt(t.amt):'')+'</div></div></div><div class="eright"><button class="btn-ghost" style="padding:4px 10px;font-size:12px" onclick="applyTemplate(this.dataset.id)" data-id="'+t.id+'">Use</button><button class="del-btn" onclick="deleteTemplate(this.dataset.id)" data-id="'+t.id+'">×</button></div></div>';
   }).join('');
+}
+
+/* ═══ DUE DAY AUTO-PAY ═══ */
+function checkDueDayAutoPay(){
+  var today=new Date();
+  var todayDate=today.getDate();
+  var m=mk();
+  if(!D.paid[m])D.paid[m]=[];
+  var paid=D.paid[m];
+  var autoPaidCount=0;
+  D.fixed.forEach(function(f){
+    if(!f.recurring||!f.dueDay||f.freq!=='Monthly')return;
+    if(paid.indexOf(f.id)>-1)return;
+    if(f.skippedMonths&&f.skippedMonths.indexOf(m)>-1)return;
+    if(f.autoLog===false)return;
+    if(todayDate!==f.dueDay)return;
+    paid.push(f.id);
+    var alreadyLogged=D.expenses.some(function(e){return e.month===m&&e.name===f.name&&e.amt===f.amt&&new Date(e.date).getDate()===todayDate;});
+    if(!alreadyLogged){
+      var parts=m.split('-');
+      var ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,todayDate,12,0,0).toISOString();
+      D.expenses.push({id:Date.now().toString()+'_dp_'+f.id,date:ed,month:m,name:f.name,cat:f.cat||'Utilities',amt:f.amt,accountId:f.accountId||(D.accounts.length?D.accounts[0].id:''),note:'Auto-paid on due date',tags:''});
+    }
+    autoPaidCount++;
+  });
+  if(autoPaidCount>0){D.paid[m]=paid;autoSave();renderFixed();renderExpenses();recalc();showToast(autoPaidCount+' fixed expense'+(autoPaidCount>1?'s':'')+' auto-paid today!','success');}
 }
 
 function initDefaults(){if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];}
