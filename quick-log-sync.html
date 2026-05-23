@@ -503,7 +503,7 @@ function initUI(){
   document.getElementById('expDate').value=lastDate;
   var savedLimit=localStorage.getItem(LSDLIMIT)||'';
   document.getElementById('dailyLimitInput').value=savedLimit;
-  renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();updateCopyLast();
+  renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();renderQLScore();updateCopyLast();
 }
 function renderCats(){var CATS=getQLCats();document.getElementById('catGrid').innerHTML=CATS.map(function(c){return '<div class="cat-btn'+(selCat===c.key?' active':'')+'" onclick="selectCat(\''+c.key+'\')"><div class="cat-icon">'+c.icon+'</div><div class="cat-name">'+c.key+'</div></div>';}).join('');}
 function selectCat(cat){selCat=cat;localStorage.setItem(LSCAT,cat);renderCats();}
