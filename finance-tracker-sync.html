@@ -738,7 +738,7 @@ function renderAccounts(){
   if(!accs.length){grid.innerHTML='<p class="empty" style="margin-bottom:1rem">No accounts yet.</p>';return;}
   grid.innerHTML=accs.map(function(a,i){var spent=D.expenses.filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
     var incIn=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0); /* BUG FIX: include extra income */
-    var bal=a.openingBalance+incIn-spent,c=AC[i%AC.length];return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">+fmt(bal)+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+fmt(spent)+'</div><button class="adel" onclick="removeAccount(\''+a.id+'\')">×</button></div>';}).join('');
+    var bal=a.openingBalance+incIn-spent,c=AC[i%AC.length];return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">'+fmt(bal)+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+fmt(spent)+'</div><button class="adel" onclick="removeAccount(\''+a.id+'\')">×</button></div>';}).join('');
 }
 function populateAccSel(){var accs=D.accounts,sel=document.getElementById('expAcc');sel.innerHTML=accs.length?accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join(''):'<option value="">No accounts</option>';}
 
