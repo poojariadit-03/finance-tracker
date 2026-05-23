@@ -190,6 +190,17 @@ input[type=date]:focus{border-color:var(--green)}
 .ql-score-pfill{height:100%;border-radius:99px;transition:width .6s}
 .ql-score-tip{font-size:11px;color:var(--tx2);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+
+.preset-row{display:flex;gap:6px;margin-bottom:10px}
+.preset-btn{flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:9px 4px;font-size:13px;font-weight:600;color:var(--tx2);cursor:pointer;font-family:inherit;transition:all .1s;text-align:center}
+.preset-btn:active{transform:scale(.95);background:var(--sur)}
+
+
+.ql-search-wrap{position:relative;margin-bottom:10px}
+.ql-search-input{width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;padding:10px 14px 10px 38px;font-size:14px;color:var(--tx);font-family:inherit;outline:none}
+.ql-search-input:focus{border-color:var(--green)}
+.ql-search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--tx3);font-size:15px;pointer-events:none}
+
 </style>
 </head>
 <body>
@@ -266,6 +277,7 @@ input[type=date]:focus{border-color:var(--green)}
     <div class="mode-toggle">
       <button class="mode-btn active-exp" id="modeExpBtn" onclick="setMode('expense')">💸 Expense</button>
       <button class="mode-btn" id="modeIncBtn" onclick="setMode('income')">💰 Income</button>
+      <button class="mode-btn" id="modeLentBtn" onclick="setMode('lent')">💸 Lent</button>
     </div>
     <div class="field-label" id="descLabel">What did you buy?</div>
     <button class="scan-btn" id="scanBtn" onclick="triggerScan()">📷 Scan receipt / UPI screenshot</button>
@@ -274,6 +286,7 @@ input[type=date]:focus{border-color:var(--green)}
     <input type="text" class="desc-input" id="expName" placeholder="e.g. Zomato biryani, Auto, Medicine...">
     <div class="field-label" id="noteLabel">Note <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></div>
     <input type="text" class="note-input" id="expNote" placeholder="e.g. trip to Pune, with friends...">
+    <input type="text" id="expTags" placeholder="#tags e.g. #work #reimbursable" class="desc-input" style="font-size:14px;margin-bottom:10px">
 
     <!-- HARD STOP BANNER -->
     <div class="hardstop-banner" id="hardstopBanner">
@@ -299,6 +312,12 @@ input[type=date]:focus{border-color:var(--green)}
       <button class="quick-btn" onclick="quickAmt(200)">₹200</button>
       <button class="quick-btn" onclick="quickAmt(500)">₹500</button>
     </div>
+    <div class="preset-row" id="presetRow">
+      <button class="preset-btn" onclick="presetAmt(50)">₹50</button>
+      <button class="preset-btn" onclick="presetAmt(100)">₹100</button>
+      <button class="preset-btn" onclick="presetAmt(200)">₹200</button>
+      <button class="preset-btn" onclick="presetAmt(500)">₹500</button>
+    </div>
     <div class="numpad">
       <button class="num-btn" onclick="numPress('1')">1</button><button class="num-btn" onclick="numPress('2')">2</button><button class="num-btn" onclick="numPress('3')">3</button>
       <button class="num-btn" onclick="numPress('4')">4</button><button class="num-btn" onclick="numPress('5')">5</button><button class="num-btn" onclick="numPress('6')">6</button>
@@ -307,11 +326,19 @@ input[type=date]:focus{border-color:var(--green)}
     </div>
     <div class="field-label">Account</div>
     <div class="acc-row" id="accRow"></div>
+    <div id="lentFields" style="display:none">
+      <div class="field-label">Return by (optional)</div>
+      <input type="date" id="lentReturnByQL" class="desc-input" style="margin-bottom:14px">
+    </div>
     <button class="copy-last-btn" id="copyLastBtn" onclick="copyLast()" style="display:none"></button>
     <button class="add-btn" id="addBtn" onclick="handleAdd()">+ Add Expense</button>
     <div class="today-header">
       <span class="today-title" id="todayTitle">Today</span>
       <span class="today-total" id="todayTotal"></span>
+    </div>
+        <div class="ql-search-wrap">
+      <span class="ql-search-ico">🔍</span>
+      <input type="text" class="ql-search-input" id="qlSearchInput" placeholder="Search expenses..." oninput="qlSearch(this.value)">
     </div>
     <div id="expList"></div>
     <div id="phoneBudgets"></div>
@@ -508,6 +535,13 @@ function initUI(){
 function renderCats(){var CATS=getQLCats();document.getElementById('catGrid').innerHTML=CATS.map(function(c){return '<div class="cat-btn'+(selCat===c.key?' active':'')+'" onclick="selectCat(\''+c.key+'\')"><div class="cat-icon">'+c.icon+'</div><div class="cat-name">'+c.key+'</div></div>';}).join('');}
 function selectCat(cat){selCat=cat;localStorage.setItem(LSCAT,cat);renderCats();}
 function renderAccs(){var accs=D.accounts,el=document.getElementById('accRow');if(!accs.length){el.innerHTML='<span style="font-size:13px;color:var(--tx3)">No accounts</span>';return;}if(!selAccId||!accs.find(function(a){return a.id===selAccId;}))selAccId=accs[0].id;el.innerHTML=accs.map(function(a){return '<button class="acc-chip'+(selAccId===a.id?' active':'')+'" onclick="selAccId=\''+a.id+'\';renderAccs()">'+a.name+'</button>';}).join('');}
+
+function presetAmt(val){
+  amtStr=String(val);
+  updateAmt();
+  if(navigator.vibrate)navigator.vibrate(30);
+}
+
 function numPress(k){if(k==='.'&&amtStr.indexOf('.')>-1)return;if(amtStr==='0'&&k!=='.')amtStr=k;else amtStr+=k;if(amtStr.length>8)amtStr=amtStr.slice(0,-1);updateAmt();}
 function numDel(){amtStr=amtStr.slice(0,-1);updateAmt();}
 function quickAmt(v){amtStr=String(v);updateAmt();if(navigator.vibrate)navigator.vibrate(30);}
@@ -545,10 +579,12 @@ function addExpense(forceOverride){
   document.getElementById('hardstopBanner').classList.remove('show');
   hardStopPending=null;
   var parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
-  D.expenses.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,cat:selCat,amt:amt,accountId:selAccId,occasion:selOccasion});
+  var tags=document.getElementById('expTags')?document.getElementById('expTags').value.trim():'';
+  D.expenses.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,tags:tags,cat:selCat,amt:amt,accountId:selAccId,occasion:selOccasion});
   localStorage.setItem(LSDATE,dv);
   autoSave();
   document.getElementById('expName').value='';document.getElementById('expNote').value='';
+  var te=document.getElementById('expTags');if(te)te.value='';
   amtStr='';updateAmt();
   document.activeElement&&document.activeElement.blur();
   renderList();renderMonthBar();updateCopyLast();
@@ -615,10 +651,24 @@ function deleteIncome(id){
   autoSave();renderList();renderMonthBar();
   showUndoToast('Deleted "'+undoStack.item.name+'"');
 }
+
+var _qlSearchQ = '';
+function qlSearch(q){
+  _qlSearchQ = q.toLowerCase().trim();
+  renderList();
+}
+
 function renderList(){
   var dv=document.getElementById('expDate').value||todayStr(),parts=dv.split('-');
   var selDay=parseInt(parts[2]),selMonth=parts[0]+'-'+parts[1];
-  var todayExps=D.expenses.filter(function(e){return e.month===selMonth&&new Date(e.date).getDate()===selDay;});
+  var todayExps=D.expenses.filter(function(e){
+    if(_qlSearchQ){
+      var matches=e.name.toLowerCase().indexOf(_qlSearchQ)>-1||(e.note&&e.note.toLowerCase().indexOf(_qlSearchQ)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(_qlSearchQ)>-1)||e.cat.toLowerCase().indexOf(_qlSearchQ)>-1;
+      if(!matches)return false;
+      return e.month===selMonth; /* search across whole month */
+    }
+    return e.month===selMonth&&new Date(e.date).getDate()===selDay;
+  });
   var todayInc=(D.extraIncome||[]).filter(function(e){return e.month===selMonth&&new Date(e.date).getDate()===selDay;});
   var el=document.getElementById('expList');
   var expTotal=todayExps.reduce(function(s,e){return s+e.amt;},0);
@@ -880,6 +930,25 @@ function initSwipes(){
 /* -- MODE & INCOME -- */
 var INC_SOURCES=[{key:'Pocket Money',icon:'💵'},{key:'Freelance',icon:'💻'},{key:'Gift',icon:'🎁'},{key:'Business',icon:'🏪'},{key:'Bonus',icon:'🎯'},{key:'Other',icon:'💰'}];
 function setMode(m){
+  var isLent=m==='lent';
+  var lentF=document.getElementById('lentFields');
+  if(lentF)lentF.style.display=isLent?'block':'none';
+  var modeLentBtn=document.getElementById('modeLentBtn');
+  if(modeLentBtn)modeLentBtn.className='mode-btn'+(isLent?' active-exp':'');
+  if(isLent){
+    document.getElementById('descLabel').textContent='Who are you lending to?';
+    document.getElementById('expName').placeholder='Person name e.g. Rahul';
+    document.getElementById('catGrid').style.display='none';
+    document.getElementById('incGrid').style.display='none';
+    var btn=document.getElementById('addBtn');
+    btn.textContent='+ Add Lent';btn.className='add-btn';
+    amtStr='';updateAmt();mode='lent';
+    // reset other buttons
+    document.getElementById('modeExpBtn').className='mode-btn';
+    document.getElementById('modeIncBtn').className='mode-btn';
+    return;
+  }
+
   mode=m;var isInc=m==='income';
   document.getElementById('modeExpBtn').className='mode-btn'+(isInc?'':' active-exp');
   document.getElementById('modeIncBtn').className='mode-btn'+(isInc?' active-inc':'');
@@ -897,7 +966,25 @@ function renderIncSources(){
     return '<div class="cat-btn'+(selIncomeSrc===s.key?' active':'')+'" onclick="selIncomeSrc=\''+s.key+'\';renderIncSources()"><div class="cat-icon">'+s.icon+'</div><div class="cat-name">'+s.key+'</div></div>';
   }).join('');
 }
-function handleAdd(){if(mode==='income')addIncome();else addExpense();}
+
+function addLentQL(){
+  var name=document.getElementById('expName').value.trim();
+  var amt=parseFloat(amtStr);
+  var dv=document.getElementById('expDate').value||todayStr();
+  var returnBy=document.getElementById('lentReturnByQL')?document.getElementById('lentReturnByQL').value:'';
+  if(!name){showToast('Enter person name','error');return;}
+  if(!amt||amt<=0){showToast('Enter amount','error');return;}
+  var parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
+  if(!D.lent)D.lent=[];
+  D.lent.push({id:Date.now().toString(),name:name,amt:amt,date:dv,returnBy:returnBy,note:'',returned:false,returnedDate:''});
+  autoSave();
+  document.getElementById('expName').value='';amtStr='';updateAmt();
+  if(navigator.vibrate)navigator.vibrate(50);
+  showToast('Lent '+fmt(amt)+' to '+name,'success');
+  renderList();
+}
+
+function handleAdd(){if(mode==='income')addIncome();else if(mode==='lent')addLentQL();else addExpense();}
 function addIncome(){
   var name=document.getElementById('expName').value.trim(),note=document.getElementById('expNote').value.trim(),amt=parseFloat(amtStr),dv=document.getElementById('expDate').value||todayStr();
   if(!name){showToast('Enter a description','error');return;}
@@ -906,7 +993,8 @@ function addIncome(){
   if(!D.extraIncome)D.extraIncome=[];
   D.extraIncome.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,source:selIncomeSrc,amt:amt,accountId:selAccId});
   localStorage.setItem(LSDATE,dv);
-  autoSave();document.getElementById('expName').value='';document.getElementById('expNote').value='';amtStr='';updateAmt();
+  autoSave();document.getElementById('expName').value='';document.getElementById('expNote').value='';
+  var te=document.getElementById('expTags');if(te)te.value='';amtStr='';updateAmt();
   document.activeElement&&document.activeElement.blur();
   renderList();renderMonthBar();
   if(navigator.vibrate)navigator.vibrate(50);
