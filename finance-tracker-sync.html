@@ -595,7 +595,6 @@ function jumpToExpense(month){
 }
 document.addEventListener('click',function(e){if(!e.target.closest||!e.target.closest('.gsearch-wrap'))document.getElementById('gsearchResults').classList.remove('show');});
 
-var db=null,saveTimer=null
 function showToast(msg,type){
   var el=document.getElementById('ftToast');
   el.textContent=msg;el.className='ft-toast '+(type||'');
