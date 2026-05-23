@@ -344,7 +344,7 @@ input[type=date]:focus{border-color:var(--green)}
 <div class="toast" id="toast"></div>
 
 <script>
-var D={config:{income:0,savpct:20},accounts:[],expenses:[],fixed:[],paid:{},goals:[],fds:[],rds:[],budgets:{},extraIncome:[],occasions:[]};
+var D={config:{income:0,savpct:20},accounts:[],expenses:[],fixed:[],paid:{},goals:[],fds:[],rds:[],budgets:{},extraIncome:[],occasions:[],customCategories:[],liabilities:[],lent:[]};
 var db=null,saveTimer=null,amtStr='',mode='expense',selIncomeSrc='Pocket Money';
 var FBKEY='ft_firebase_config';
 var LSCAT='ql_last_cat',LSDATE='ql_last_date',LSDLIMIT='ql_daily_limit';
@@ -352,8 +352,11 @@ var selCat=localStorage.getItem(LSCAT)||'Food';
 var selAccId='',selOccasion='';
 var editingId=null,editingType=null;
 var hardStopPending=null;
-var CATS=[{key:'Food',icon:'🍕'},{key:'Transport',icon:'🚗'},{key:'Shopping',icon:'🛍️'},{key:'Health',icon:'💊'},{key:'Entertainment',icon:'🎬'},{key:'Utilities',icon:'💡'},{key:'Education',icon:'📚'},{key:'Other',icon:'📦'}];
+var BUILTIN_CATS_QL=[{key:'Food',icon:'🍕'},{key:'Transport',icon:'🚗'},{key:'Shopping',icon:'🛍️'},{key:'Health',icon:'💊'},{key:'Entertainment',icon:'🎬'},{key:'Utilities',icon:'💡'},{key:'Education',icon:'📚'},{key:'Other',icon:'📦'}];
+var CATS=BUILTIN_CATS_QL; /* updated dynamically after Firebase load */
+function getQLCats(){return BUILTIN_CATS_QL.concat((D.customCategories||[]).map(function(c){return {key:c.name,icon:c.emoji||'🏷️'};}));}
 var CCOLS={Food:'#1D9E75',Transport:'#378ADD',Shopping:'#D4537E',Health:'#7F77DD',Entertainment:'#EF9F27',Utilities:'#3B6D11',Education:'#534AB7',Other:'#888780'};
+function getQLCatColor(name){var custom=(D.customCategories||[]).find(function(c){return c.name===name;});if(custom)return custom.color;return CCOLS[name]||'#888780';}
 
 function extractConfig(txt){var cfg={},keys=['apiKey','authDomain','databaseURL','projectId','storageBucket','messagingSenderId','appId'];keys.forEach(function(k){var m=txt.match(new RegExp(k+'\\s*:\\s*["\']([^"\']+)["\']'));if(m)cfg[k]=m[1];});return cfg;}
 function connectFirebase(){
@@ -372,11 +375,11 @@ function loadFromFirebase(){
   document.getElementById('loadingTxt').textContent='Loading your data...';
   db.ref('finances/data').once('value').then(function(snap){
     var val=snap.val();
-    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.extraIncome)D.extraIncome=[];}catch(e){}}
+    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];if(!D.liabilities)D.liabilities=[];if(!D.lent)D.lent=[];}catch(e){}}
     if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];
     document.getElementById('loading').style.display='none';document.getElementById('app').style.display='block';
     initUI();setSyncStatus('synced');
-    db.ref('finances/data').on('value',function(snap){var v=snap.val();if(v){try{var fresh=JSON.parse(v);if(!fresh.extraIncome)fresh.extraIncome=[];if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;renderAccs();renderList();}}catch(e){}}});
+    db.ref('finances/data').on('value',function(snap){var v=snap.val();if(v){try{var fresh=JSON.parse(v);if(!fresh.extraIncome)fresh.extraIncome=[];if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.liabilities)fresh.liabilities=[];if(!fresh.lent)fresh.lent=[];if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;renderAccs();renderList();}}catch(e){}}});
   }).catch(function(e){document.getElementById('loadingTxt').textContent='Error: '+e.message;});
 }
 function autoSave(){setSyncStatus('syncing');if(saveTimer)clearTimeout(saveTimer);saveTimer=setTimeout(function(){db.ref('finances/data').set(JSON.stringify(D)).then(function(){setSyncStatus('synced');}).catch(function(){setSyncStatus('error');});},2000);}
@@ -395,7 +398,7 @@ function initUI(){
   document.getElementById('dailyLimitInput').value=savedLimit;
   renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();updateCopyLast();
 }
-function renderCats(){document.getElementById('catGrid').innerHTML=CATS.map(function(c){return '<div class="cat-btn'+(selCat===c.key?' active':'')+'" onclick="selectCat(\''+c.key+'\')"><div class="cat-icon">'+c.icon+'</div><div class="cat-name">'+c.key+'</div></div>';}).join('');}
+function renderCats(){var CATS=getQLCats();document.getElementById('catGrid').innerHTML=CATS.map(function(c){return '<div class="cat-btn'+(selCat===c.key?' active':'')+'" onclick="selectCat(\''+c.key+'\')"><div class="cat-icon">'+c.icon+'</div><div class="cat-name">'+c.key+'</div></div>';}).join('');}
 function selectCat(cat){selCat=cat;localStorage.setItem(LSCAT,cat);renderCats();}
 function renderAccs(){var accs=D.accounts,el=document.getElementById('accRow');if(!accs.length){el.innerHTML='<span style="font-size:13px;color:var(--tx3)">No accounts</span>';return;}if(!selAccId||!accs.find(function(a){return a.id===selAccId;}))selAccId=accs[0].id;el.innerHTML=accs.map(function(a){return '<button class="acc-chip'+(selAccId===a.id?' active':'')+'" onclick="selAccId=\''+a.id+'\';renderAccs()">'+a.name+'</button>';}).join('');}
 function numPress(k){if(k==='.'&&amtStr.indexOf('.')>-1)return;if(amtStr==='0'&&k!=='.')amtStr=k;else amtStr+=k;if(amtStr.length>8)amtStr=amtStr.slice(0,-1);updateAmt();}
@@ -526,7 +529,7 @@ function renderList(){
     return '<div class="swipe-wrap" data-id="'+e.id+'" data-type="income">'+inner+'<div class="swipe-bg"><span class="del-ico">🗑</span></div></div>';
   }).join('');
   var expHtml=todayExps.slice().reverse().map(function(e){
-    var c=CCOLS[e.cat]||'#888',ico=(CATS.find(function(x){return x.key===e.cat;})||{icon:'📦'}).icon;
+    var c=getQLCatColor(e.cat),ico=(CATS.find(function(x){return x.key===e.cat;})||{icon:'📦'}).icon;
     var meta=dateStr+' · '+e.cat+(e.note?' · '+e.note:'');
     var inner='<div class="exp-item" onclick="openEditModal(\''+e.id+'\',\'expense\')"><div class="exp-left"><div class="exp-dot" style="background:'+c+'22">'+ico+'</div><div class="exp-info"><div class="exp-name">'+e.name+'</div><div class="exp-meta">'+meta+'</div></div></div><div class="exp-right"><span class="exp-amt" style="color:'+c+'">'+fmt(e.amt)+'</span></div></div>';
     return '<div class="swipe-wrap" data-id="'+e.id+'" data-type="expense">'+inner+'<div class="swipe-bg"><span class="del-ico">🗑</span></div></div>';
