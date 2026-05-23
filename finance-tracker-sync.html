@@ -428,7 +428,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <div class="mgrid">
     <div class="metric"><div class="mlabel">Income</div><div class="mval blue" id="s-income">₹0</div></div>
     <div class="metric" id="s-extra-box" style="display:none"><div class="mlabel">Extra Income</div><div class="mval green" id="s-extra">₹0</div></div>
-    <div class="metric"><div class="mlabel">Fixed</div><div class="mval red" id="s-fixed">₹0</div></div>
+    <div class="metric"><div class="mlabel">Fixed <span id="fixedEstLabel" style="font-size:9px;color:var(--tx3);font-weight:400"></span></div><div class="mval red" id="s-fixed">₹0</div></div>
     <div class="metric"><div class="mlabel">Spent</div><div class="mval red" id="s-daily">₹0</div></div>
     <div class="metric"><div class="mlabel">Savings</div><div class="mval green" id="s-savings">₹0</div></div>
     <div class="metric"><div class="mlabel">Balance</div><div class="mval" id="s-balance">₹0</div></div>
@@ -533,6 +533,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
         <button class="btn" onclick="saveBudget()">Save</button>
         <button class="btn-ghost" onclick="clearBudget()">Clear selected</button>
       </div>
+      <div id="budgetHint" style="font-size:12px;color:var(--tx3);margin-top:6px"></div>
     </div>
     <div id="budgetBars"></div>
   </div>
@@ -627,6 +628,15 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   </div>
 </div>
 <div class="tab-content" id="tab-history">
+  <div class="card">
+    <div class="card-hd">
+      <span class="ctitle">📈 Savings comparison</span>
+      <select id="savingsMonthRange" onchange="renderSavingsComparison();syncSavPill(this.value)" style="font-size:12px;padding:4px 8px;max-width:100px">
+        <option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option>
+      </select>
+    </div>
+    <div id="savingsComparisonBody"></div>
+  </div>
   <div class="hist-filter" id="histFilter">
     <button class="hist-pill" onclick="setHistRange(15,this)">15 Days</button>
     <button class="hist-pill" onclick="setHistRange(30,this)">30 Days</button>
@@ -748,7 +758,55 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <div class="mgrid">
     <div class="metric"><div class="mlabel">Total Assets</div><div class="mval green" id="nw-assets">₹0</div></div>
     <div class="metric"><div class="mlabel">Liabilities</div><div class="mval red" id="nw-liab">₹0</div></div>
-    <div class="metric"><div class="mlabel">Net Worth</div><div class="mval" id="nw-total">₹0</div></di<script>
+    <div class="metric"><div class="mlabel">Net Worth</div><div class="mval" id="nw-total">₹0</div></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><span class="ctitle">Assets breakdown</span></div>
+    <div id="nw-assets-list"><p class="empty">No asset data yet.</p></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><span class="ctitle">Liabilities</span><button class="btn-ghost" onclick="toggleForm('liab-form')">+ Add</button></div>
+    <div id="liab-form" style="display:none;margin-bottom:12px">
+      <div class="irow">
+        <input type="text" id="liabName" placeholder="e.g. Home Loan, Credit Card" style="flex:2">
+        <input type="number" id="liabAmt" placeholder="Amount ₹" style="max-width:160px">
+        <button class="btn" onclick="addLiability()">+ Add</button>
+      </div>
+    </div>
+    <div id="nw-liab-list"><p class="empty">No liabilities. Great!</p></div>
+  </div>
+</div>
+<div class="tab-content" id="tab-lent">
+  <div class="mgrid">
+    <div class="metric"><div class="mlabel">Total Lent</div><div class="mval red" id="lent-total">₹0</div></div>
+    <div class="metric"><div class="mlabel">Pending</div><div class="mval" style="color:var(--amber)" id="lent-pending">₹0</div></div>
+    <div class="metric"><div class="mlabel">Returned</div><div class="mval green" id="lent-returned">₹0</div></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><span class="ctitle">Lend money</span></div>
+    <div class="irow">
+      <input type="text" id="lentName" placeholder="Person name e.g. Rahul" style="flex:2">
+      <input type="number" id="lentAmt" placeholder="₹ Amount" style="max-width:140px">
+      <input type="date" id="lentDate" style="max-width:145px">
+      <input type="date" id="lentReturnBy" style="max-width:145px">
+    </div>
+    <div class="irow">
+      <input type="text" id="lentNote" placeholder="Note (optional)" style="flex:1">
+      <button class="btn" onclick="addLent()" style="background:var(--red)">+ Add Lent</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><span class="ctitle">Pending returns</span><span id="lentOverdueNote" style="font-size:12px;color:var(--red)"></span></div>
+    <div id="lentPendingList"><p class="empty">No pending amounts.</p></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><span class="ctitle">Returned ✓</span></div>
+    <div id="lentReturnedList"><p class="empty">No returned amounts yet.</p></div>
+  </div>
+</div>
+
+<div id="ftToast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:10px 18px;font-size:14px;font-weight:500;color:var(--tx);box-shadow:0 8px 24px rgba(0,0,0,.4);transition:transform .3s cubic-bezier(.34,1.56,.64,1);z-index:998;white-space:nowrap;display:none"></div>
+<script>
 
 /* ═══ DATA ═══ */
 var D={config:{income:0,savpct:20,theme:'auto',fontSize:'normal',dailyLimit:0},accounts:[],expenses:[],fixed:[],paid:{},goals:[],fds:[],rds:[],budgets:{},autoLogged:[],extraIncome:[],monthResetSeen:[],customCategories:[],liabilities:[],lent:[],
@@ -1331,8 +1389,8 @@ function setQFilter(mode,btn){
   renderExpenses(document.getElementById('expSearch').value||undefined);
 }
 
-function filterExpenses(){var txt=document.getElementById('expSearch').value,dt=document.getElementById('expDateFilter').value;renderExpenses(txt||null,dt||null);}
-function clearExpFilter(){document.getElementById('expDateFilter').value='';document.getElementById('expSearch').value='';renderExpenses();}
+function filterExpenses(){var txt=document.getElementById('expSearch').value;renderExpenses(txt||null);}
+function clearExpFilter(){document.getElementById('expSearch').value='';renderExpenses();}
 function searchExpenses(q){renderExpenses(q);}
 
 /* ═══ BUDGETS ═══ */
