@@ -884,7 +884,7 @@ function renderExpenses(textFilter,dateFilter){
   }
   el.innerHTML=arr.slice().reverse().map(function(e){var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{month:'short',day:'numeric'}),acc=accs.find(function(a){return a.id===e.accountId;});var tagHtml='';if(e.tags){e.tags.split(' ').filter(Boolean).forEach(function(t){tagHtml+='<span style="display:inline-block;background:var(--bbg,#E6F1FB);color:var(--blue,#185FA5);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:3px">'+t+'</span>';});}
     var noteHtml=e.note?'<div style="font-size:11px;color:var(--tx3);font-style:italic">📝 '+e.note+'</div>':'';
-    return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span><button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="edit-btn" onclick="duplicateExpense(\''+e.id+'\')">⧉</button><button class="del-btn" onclick="removeExpense(\''+e.id+'\')">×</button></div></div>';}).join('');
+    return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span><button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="del-btn" onclick="removeExpense(\''+e.id+'\')">×</button></div></div>';}).join('');
   renderBudgetBars();checkBudgetAlerts();
 }
 
