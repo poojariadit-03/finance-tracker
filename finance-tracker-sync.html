@@ -222,6 +222,32 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
 .return-btn{background:var(--gbg);color:var(--green);border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .return-btn:hover{opacity:.8}
 
+
+/* Financial Health Score */
+.score-ring-wrap{display:flex;align-items:center;gap:24px;margin-bottom:16px}
+.score-ring{position:relative;width:90px;height:90px;flex-shrink:0}
+.score-ring svg{transform:rotate(-90deg)}
+.score-ring-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'DM Mono',monospace}
+.score-num{font-size:22px;font-weight:700;line-height:1}
+.score-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-top:2px}
+.score-right{flex:1;min-width:0}
+.score-grade{font-size:16px;font-weight:700;margin-bottom:4px}
+.score-tip{font-size:12px;color:var(--tx2);line-height:1.5}
+.score-factors{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}
+.sf-item{background:var(--sur2);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px}
+.sf-bar-wrap{flex:1;min-width:0}
+.sf-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--tx3);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sf-bar{height:4px;background:var(--bdr);border-radius:99px;overflow:hidden}
+.sf-fill{height:100%;border-radius:99px;transition:width .5s}
+.sf-pts{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;flex-shrink:0}
+/* Quick log score bar */
+.ql-score-bar{background:var(--sur2);border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px}
+.ql-score-num{font-family:'DM Mono',monospace;font-size:20px;font-weight:700;flex-shrink:0}
+.ql-score-right{flex:1;min-width:0}
+.ql-score-label{font-size:11px;font-weight:600;color:var(--tx3);margin-bottom:4px}
+.ql-score-pbg{height:5px;background:var(--bdr);border-radius:99px;overflow:hidden}
+.ql-score-pfill{height:100%;border-radius:99px;transition:width .5s}
+
 </style>
 </head>
 <body>
@@ -312,6 +338,12 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div class="metric"><div class="mlabel">Spent</div><div class="mval red" id="s-daily">₹0</div></div>
     <div class="metric"><div class="mlabel">Savings</div><div class="mval green" id="s-savings">₹0</div></div>
     <div class="metric"><div class="mlabel">Balance</div><div class="mval" id="s-balance">₹0</div></div>
+  </div>
+  <div class="card" id="healthScoreCard">
+    <div class="card-hd"><span class="ctitle">💚 Financial Health Score</span><span style="font-size:11px;color:var(--tx3)">Updated live</span></div>
+    <div id="healthScoreBody">
+      <div style="font-size:13px;color:var(--tx3)">Calculating...</div>
+    </div>
   </div>
   <div class="card" id="dailyLimitCard">
     <div class="card-hd"><span class="ctitle">Daily spending limit</span><button class="btn-ghost" onclick="toggleForm('daily-limit-form')">⚙️ Set</button></div>
@@ -749,6 +781,7 @@ function recalc(){
   var rows=[{l:'Fixed expenses',v:fxd,p:totalIncome>0?fxd/totalIncome*100:0,c:'var(--red)'},{l:'Daily spending',v:spent,p:totalIncome>0?spent/totalIncome*100:0,c:'#D4537E'},{l:'Savings',v:savA,p:totalIncome>0?savA/totalIncome*100:0,c:'var(--green)'}];
   document.getElementById('budgetHealth').innerHTML=rows.map(function(r){return '<div class="hrow"><div class="hlabel"><span>'+r.l+'</span><span style="font-family:\'DM Mono\',monospace;font-weight:500">'+fmt(r.v)+' <span style="color:var(--tx3)">('+r.p.toFixed(1)+'%)</span></span></div><div class="pbg"><div class="pfill" style="width:'+Math.min(100,r.p).toFixed(1)+'%;background:'+r.c+'"></div></div></div>';}).join('');
   renderDailyLimit();
+  renderHealthScore();
   renderMonthlySummary();
 }
 
@@ -1465,6 +1498,136 @@ function renderLent(){
     }).join('');
   }
   updateLentBadge();
+}
+
+
+/* ═══ FINANCIAL HEALTH SCORE ═══ */
+function calcHealthScore(){
+  var score=0, factors=[];
+  var income=(D.config.income||0)+extraIncomeTotal();
+  var fxd=fixedMonthly();
+  var spent=getExpenses().reduce(function(s,e){return s+e.amt;},0);
+  var savT=income*(D.config.savpct||20)/100;
+  var savA=Math.max(0,income-fxd-spent);
+
+  /* 1. Savings rate (25pts) */
+  var savPts=0;
+  if(income>0&&savT>0){
+    savPts=Math.round(Math.min(25, savA/savT*25));
+  } else if(income===0){ savPts=12; } /* no income set, neutral */
+  score+=savPts;
+  factors.push({label:'Savings rate',pts:savPts,max:25,tip:income>0?(savA>=savT?'Meeting savings goal':'Saved '+fmt(savA)+' of '+fmt(savT)+' goal'):'Set income to track'});
+
+  /* 2. Budget control (20pts) */
+  var budgets=D.budgets,budgetCats=Object.keys(budgets);
+  var budgetPts=20;
+  if(budgetCats.length>0){
+    var catSpend={};getExpenses().forEach(function(e){catSpend[e.cat]=(catSpend[e.cat]||0)+e.amt;});
+    var overCount=budgetCats.filter(function(c){return (catSpend[c]||0)>budgets[c];}).length;
+    var nearCount=budgetCats.filter(function(c){var u=catSpend[c]||0;return u<=budgets[c]&&u/budgets[c]>=0.85;}).length;
+    budgetPts=Math.max(0, 20 - overCount*8 - nearCount*3);
+  }
+  score+=budgetPts;
+  var overCats=budgetCats.filter(function(c){var s={}; getExpenses().forEach(function(e){s[e.cat]=(s[e.cat]||0)+e.amt;}); return (s[c]||0)>budgets[c];});
+  factors.push({label:'Budget control',pts:budgetPts,max:20,tip:budgetCats.length===0?'No budgets set':(overCats.length?overCats.length+' categor'+(overCats.length>1?'ies':'y')+' over limit':'All categories within budget')});
+
+  /* 3. Bills paid on time (15pts) */
+  var recurring=D.fixed.filter(function(f){return f.recurring;});
+  var paid=getPaid();
+  var billPts=15;
+  if(recurring.length>0){
+    var paidCount=recurring.filter(function(f){return paid.indexOf(f.id)>-1;}).length;
+    billPts=Math.round(paidCount/recurring.length*15);
+  }
+  score+=billPts;
+  factors.push({label:'Bills paid',pts:billPts,max:15,tip:recurring.length===0?'No recurring bills':(billPts===15?'All bills marked paid':paid.length+'/'+recurring.length+' paid this month')});
+
+  /* 4. Lent money (10pts) */
+  var lent=D.lent||[];
+  var overdueLent=lent.filter(function(l){
+    if(l.returned||!l.returnBy)return false;
+    return new Date(l.returnBy)<new Date();
+  });
+  var lentPts=Math.max(0, 10 - overdueLent.length*5);
+  score+=lentPts;
+  factors.push({label:'Lent money',pts:lentPts,max:10,tip:overdueLent.length===0?'No overdue lent amounts':overdueLent.length+' overdue return'+(overdueLent.length>1?'s':'')});
+
+  /* 5. Net worth positive (15pts) */
+  var accs=D.accounts;
+  var accTotal=accs.reduce(function(s,a){
+    var sp=D.expenses.filter(function(e){return e.accountId===a.id;}).reduce(function(t,e){return t+e.amt;},0);
+    var inc=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(t,e){return t+e.amt;},0);
+    return s+(a.openingBalance+inc-sp);
+  },0);
+  var fdTotal=(D.fds||[]).reduce(function(s,fd){return s+calcFD(fd.amt,fd.rate,Math.min(mElapsed(fd.start),fd.tenure));},0);
+  var rdTotal=(D.rds||[]).reduce(function(s,rd){var el=Math.min(mElapsed(rd.start),rd.tenure);return s+(el>0?calcRD(rd.amt,rd.rate,el):0);},0);
+  var goalTotal=(D.goals||[]).reduce(function(s,g){return s+(g.contributions||[]).reduce(function(t,c){return t+c.amount;},0);},0);
+  var pendingLent=lent.filter(function(l){return !l.returned;}).reduce(function(s,l){return s+l.amt;},0);
+  var totalAssets=accTotal+fdTotal+rdTotal+goalTotal+pendingLent;
+  var totalLiab=(D.liabilities||[]).reduce(function(s,l){return s+l.amt;},0);
+  var netWorth=totalAssets-totalLiab;
+  var nwPts=netWorth>=0?15:Math.max(0,15+Math.round(netWorth/10000));
+  score+=nwPts;
+  factors.push({label:'Net worth',pts:nwPts,max:15,tip:netWorth>=0?'Net worth: '+fmt(netWorth):'Liabilities exceed assets by '+fmt(Math.abs(netWorth))});
+
+  /* 6. Daily limit (15pts) */
+  var limitPts=15;
+  var dailyLimit=D.config.dailyLimit||0;
+  if(dailyLimit>0){
+    var today=new Date();
+    var todaySpent=D.expenses.filter(function(e){
+      var d=new Date(e.date);
+      return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth()&&d.getDate()===today.getDate();
+    }).reduce(function(s,e){return s+e.amt;},0);
+    var ratio=todaySpent/dailyLimit;
+    limitPts=ratio<=1?15:Math.max(0,Math.round(15-(ratio-1)*15));
+  }
+  score+=limitPts;
+  factors.push({label:'Daily limit',pts:limitPts,max:15,tip:dailyLimit===0?'No daily limit set':(limitPts===15?'Within daily limit':'Over daily limit today')});
+
+  return {score:Math.min(100,score), factors:factors};
+}
+
+function getScoreGrade(score){
+  if(score>=85)return {grade:'Excellent 🌟',color:'var(--green)'};
+  if(score>=70)return {grade:'Good 👍',color:'#5DCAA5'};
+  if(score>=55)return {grade:'Fair ⚡',color:'var(--amber)'};
+  if(score>=40)return {grade:'Needs Work ⚠️',color:'#D4537E'};
+  return {grade:'Critical 🔴',color:'var(--red)'};
+}
+
+function renderHealthScore(){
+  var el=document.getElementById('healthScoreBody');if(!el)return;
+  var result=calcHealthScore();
+  var score=result.score, factors=result.factors;
+  var g=getScoreGrade(score);
+  var circumference=2*Math.PI*36; /* r=36 */
+  var dashOffset=circumference*(1-score/100);
+  var worstFactor=factors.slice().sort(function(a,b){return (a.pts/a.max)-(b.pts/b.max);})[0];
+  var tips=factors.filter(function(f){return f.pts<f.max;}).map(function(f){return f.tip;}).slice(0,2);
+
+  var html='<div class="score-ring-wrap">';
+  html+='<div class="score-ring">';
+  html+='<svg width="90" height="90" viewBox="0 0 90 90">';
+  html+='<circle cx="45" cy="45" r="36" fill="none" stroke="var(--sur2)" stroke-width="8"/>';
+  html+='<circle cx="45" cy="45" r="36" fill="none" stroke="'+g.color+'" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+circumference.toFixed(1)+'" stroke-dashoffset="'+dashOffset.toFixed(1)+'"/>';
+  html+='</svg>';
+  html+='<div class="score-ring-num"><span class="score-num" style="color:'+g.color+'">'+score+'</span><span class="score-lbl">/ 100</span></div>';
+  html+='</div>';
+  html+='<div class="score-right">';
+  html+='<div class="score-grade" style="color:'+g.color+'">'+g.grade+'</div>';
+  if(tips.length){html+='<div class="score-tip">'+tips.join(' · ')+'</div>';}
+  else{html+='<div class="score-tip" style="color:var(--green)">Everything looks great!</div>';}
+  html+='</div></div>';
+
+  html+='<div class="score-factors">';
+  factors.forEach(function(f){
+    var pct=Math.round(f.pts/f.max*100);
+    var col=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+    html+='<div class="sf-item"><div class="sf-bar-wrap"><div class="sf-label">'+f.label+'</div><div class="sf-bar"><div class="sf-fill" style="width:'+pct+'%;background:'+col+'"></div></div></div><span class="sf-pts" style="color:'+col+'">'+f.pts+'/'+f.max+'</span></div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
 }
 
 function initDefaults(){if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];}
