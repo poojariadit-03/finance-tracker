@@ -1017,7 +1017,8 @@ function renderHistory(){
   var dark=matchMedia('(prefers-color-scheme:dark)').matches;
   _hist=new Chart(document.getElementById('histChart'),{type:'bar',data:{labels:data.map(function(d){return d.label;}),datasets:[{label:'Income',data:data.map(function(d){return d.income;}),backgroundColor:'#378ADD',borderRadius:4},{label:'Expenses',data:data.map(function(d){return d.fxd+d.spent;}),backgroundColor:'#D85A30',borderRadius:4},{label:'Savings',data:data.map(function(d){return d.savings;}),backgroundColor:'#1D9E75',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)'},ticks:{callback:function(v){return '₹'+(v>=100000?(v/100000).toFixed(0)+'L':v>=1000?(v/1000).toFixed(0)+'K':v);}}}}}});
   document.getElementById('histLeg').innerHTML=[{l:'Income',c:'#378ADD'},{l:'Expenses',c:'#D85A30'},{l:'Savings',c:'#1D9E75'}].map(function(x){return '<span class="legitem"><span class="legdot" style="background:'+x.c+'"></span>'+x.l+'</span>';}).join('');
-  document.getElementById('histBody').innerHTML=data.map(function(d){return '<tr><td>'+d.label+'</td><td>'+fmt(d.income)+'</td><td>'+fmt(d.fxd)+'</td><td>'+fmt(d.spent)+'</td><td style="color:var(--green)">'+fmt(d.savings)+'</td><td style="color:'+(d.balance>=0?'var(--green)':'var(--red)')+'">'+fmt(d.balance)+'</td></tr>';}).join('');
+  document.getElementById('histBody').innerHTML=data.map(function(d){return '<tr><td>'+d.label+'</td><td>'+fmt(d.income)+'</td><td>'+fmt(d.fxd)+'</td><td>'+fmt(d.spent)+'</td><td style="color:var(--green)">'+fmt(d.savings)+'</td><td style="color:'+(d.balance>=0?'var(--green)':'var(--red)')+'">'+fmt(d.balance)+'</td></tr>';
+  renderSavingsComparison();}).join('');
 }
 
 /* ═══ CHARTS ═══ */
