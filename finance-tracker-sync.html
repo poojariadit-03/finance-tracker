@@ -464,6 +464,16 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <div class="card"><div class="card-hd"><span class="ctitle">Fixed expenses</span><span style="font-size:12px;color:var(--tx3)" id="recurStatus"></span></div><div id="fixedList"></div></div>
 </div>
 <div class="tab-content" id="tab-history">
+  <div class="hist-filter" id="histFilter">
+    <button class="hist-pill" onclick="setHistRange(15,this)">15 Days</button>
+    <button class="hist-pill" onclick="setHistRange(30,this)">30 Days</button>
+    <button class="hist-pill" onclick="setHistRange(2,this)">2 Months</button>
+    <button class="hist-pill" onclick="setHistRange(3,this)">3 Months</button>
+    <button class="hist-pill" onclick="setHistRange(5,this)">5 Months</button>
+    <button class="hist-pill active" onclick="setHistRange(6,this)">6 Months</button>
+    <button class="hist-pill" onclick="setHistRange(9,this)">9 Months</button>
+    <button class="hist-pill" onclick="setHistRange(12,this)">12 Months</button>
+  </div>
   <div class="card"><div class="card-hd"><span class="ctitle">6-month comparison</span></div><div style="position:relative;height:220px"><canvas id="histChart"></canvas></div><div class="legwrap" id="histLeg"></div></div>
   <div class="card"><div class="card-hd"><span class="ctitle">Monthly summary</span></div><div style="overflow-x:auto"><table class="htable"><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody id="histBody"></tbody></table></div></div>
 </div>
