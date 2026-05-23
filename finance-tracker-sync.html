@@ -1448,7 +1448,7 @@ function renderLent(){
         else if(diff<=3)pill='<span class="due-soon-pill">Due in '+diff+'d</span>';
         else pill='<span style="font-size:10px;color:var(--tx3);margin-left:6px">Due '+rb.toLocaleDateString('en-IN',{day:"numeric",month:"short"})+'</span>';
       }
-      return '<div class="lent-item"><div class="lent-left"><div class="lent-name">'+l.name+pill+'</div><div class="lent-meta">Lent on '+lentDate+(l.note?' · '+l.note:'')+'</div></div><div class="lent-right"><span style="font-family:'DM Mono',monospace;font-weight:600;font-size:15px;color:var(--red)">'+fmt(l.amt)+'</span><button class="return-btn" onclick="markReturned(''+l.id+'')">✓ Returned</button><button class="del-btn" onclick="deleteLent(''+l.id+'')">×</button></div></div>';
+      return '<div class="lent-item"><div class="lent-left"><div class="lent-name">'+l.name+pill+'</div><div class="lent-meta">Lent on '+lentDate+(l.note?' · '+l.note:'')+'</div></div><div class="lent-right"><span style="font-family:monospace;font-weight:600;font-size:15px;color:var(--red)">'+fmt(l.amt)+'</span><button class="return-btn" onclick="markReturned(\''+l.id+'\')" >✓ Returned</button><button class="del-btn" onclick="deleteLent(\''+l.id+'\')" >×</button></div></div>';
     }).join('');
   }
   /* Returned list */
@@ -1458,7 +1458,7 @@ function renderLent(){
     rEl.innerHTML=returned.slice().reverse().map(function(l){
       var lentDate=new Date(l.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
       var retDate=l.returnedDate?new Date(l.returnedDate).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'—';
-      return '<div class="lent-item"><div class="lent-left"><div class="lent-name" style="color:var(--tx2)">'+l.name+'</div><div class="lent-meta">Lent '+lentDate+' · Returned '+retDate+(l.note?' · '+l.note:'')+'</div></div><div class="lent-right"><span style="font-family:'DM Mono',monospace;font-size:14px;color:var(--green)">'+fmt(l.amt)+'</span><button class="del-btn" onclick="deleteLent(''+l.id+'')">×</button></div></div>';
+      return '<div class="lent-item"><div class="lent-left"><div class="lent-name" style="color:var(--tx2)">'+l.name+'</div><div class="lent-meta">Lent '+lentDate+' · Returned '+retDate+(l.note?' · '+l.note:'')+'</div></div><div class="lent-right"><span style="font-family:monospace;font-size:14px;color:var(--green)">'+fmt(l.amt)+'</span><button class="del-btn" onclick="deleteLent(\''+l.id+'\')" >×</button></div></div>';
     }).join('');
   }
   updateLentBadge();
