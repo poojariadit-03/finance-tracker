@@ -311,6 +311,7 @@ input[type=date]:focus{border-color:var(--green)}
       <button class="quick-btn" onclick="quickAmt(100)">₹100</button>
       <button class="quick-btn" onclick="quickAmt(200)">₹200</button>
       <button class="quick-btn" onclick="quickAmt(500)">₹500</button>
+      <button class="quick-btn" onclick="quickAmt(1000)">₹1k</button>
     </div>
     <div class="preset-row" id="presetRow">
       <button class="preset-btn" onclick="presetAmt(50)">₹50</button>
@@ -332,8 +333,12 @@ input[type=date]:focus{border-color:var(--green)}
     </div>
     <button class="copy-last-btn" id="copyLastBtn" onclick="copyLast()" style="display:none"></button>
     <button class="add-btn" id="addBtn" onclick="handleAdd()">+ Add Expense</button>
+    <div class="ql-search-wrap" style="margin-bottom:10px">
+      <span class="ql-search-ico">🔍</span>
+      <input type="text" class="ql-search-input" id="qlSearchInput" placeholder="Search today's entries..." oninput="filterQLList(this.value)">
+    </div>
     <div class="today-header">
-      <span class="today-title" id="todayTitle">Today</span>
+      <div style="display:flex;align-items:center;gap:8px"><span class="today-title" id="todayTitle">Today</span><button onclick="toggleViewAll()" id="viewAllBtn" style="background:none;border:1px solid var(--bdr);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:500;color:var(--tx2);cursor:pointer;font-family:inherit;transition:all .15s">All</button></div>
       <span class="today-total" id="todayTotal"></span>
     </div>
         <div class="ql-search-wrap">
@@ -390,7 +395,7 @@ input[type=date]:focus{border-color:var(--green)}
 
 <script>
 var D={config:{income:0,savpct:20},accounts:[],expenses:[],fixed:[],paid:{},goals:[],fds:[],rds:[],budgets:{},extraIncome:[],occasions:[],customCategories:[],liabilities:[],lent:[]};
-var db=null,saveTimer=null,amtStr='',mode='expense',selIncomeSrc='Pocket Money';
+var db=null,saveTimer=null,amtStr='',mode='expense',selIncomeSrc='Pocket Money',toastTimer=null;
 var FBKEY='ft_firebase_config';
 var LSCAT='ql_last_cat',LSDATE='ql_last_date',LSDLIMIT='ql_daily_limit';
 var selCat=localStorage.getItem(LSCAT)||'Food';
@@ -420,11 +425,11 @@ function loadFromFirebase(){
   document.getElementById('loadingTxt').textContent='Loading your data...';
   db.ref('finances/data').once('value').then(function(snap){
     var val=snap.val();
-    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];if(!D.liabilities)D.liabilities=[];if(!D.lent)D.lent=[];}catch(e){}}
+    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];if(!D.lent)D.lent=[];}catch(e){}}
     if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];
     document.getElementById('loading').style.display='none';document.getElementById('app').style.display='block';
     initUI();setSyncStatus('synced');
-    db.ref('finances/data').on('value',function(snap){var v=snap.val();if(v){try{var fresh=JSON.parse(v);if(!fresh.extraIncome)fresh.extraIncome=[];if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.liabilities)fresh.liabilities=[];if(!fresh.lent)fresh.lent=[];if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;renderAccs();renderList();}}catch(e){}}});
+    db.ref('finances/data').on('value',function(snap){var v=snap.val();if(v){try{var fresh=JSON.parse(v);if(!fresh.extraIncome)fresh.extraIncome=[];if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.occasions)fresh.occasions=[];if(!fresh.liabilities)fresh.liabilities=[];if(!fresh.lent)fresh.lent=[];if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;renderAccs();renderList();}}catch(e){}}});
   }).catch(function(e){document.getElementById('loadingTxt').textContent='Error: '+e.message;});
 }
 
@@ -530,9 +535,9 @@ function initUI(){
   document.getElementById('expDate').value=lastDate;
   var savedLimit=localStorage.getItem(LSDLIMIT)||'';
   document.getElementById('dailyLimitInput').value=savedLimit;
-  renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();renderQLScore();updateCopyLast();
+  renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();renderQLScore();updateCopyLast();updateLentAlertQL();
 }
-function renderCats(){var CATS=getQLCats();document.getElementById('catGrid').innerHTML=CATS.map(function(c){return '<div class="cat-btn'+(selCat===c.key?' active':'')+'" onclick="selectCat(\''+c.key+'\')"><div class="cat-icon">'+c.icon+'</div><div class="cat-name">'+c.key+'</div></div>';}).join('');}
+function renderCats(){var _allCats=getQLCats();document.getElementById('catGrid').innerHTML=_allCats.map(function(c){return '<div class="cat-btn'+(selCat===c.key?' active':'')+'" onclick="selectCat(\''+c.key+'\')"><div class="cat-icon">'+c.icon+'</div><div class="cat-name">'+c.key+'</div></div>';}).join('');}
 function selectCat(cat){selCat=cat;localStorage.setItem(LSCAT,cat);renderCats();}
 function renderAccs(){var accs=D.accounts,el=document.getElementById('accRow');if(!accs.length){el.innerHTML='<span style="font-size:13px;color:var(--tx3)">No accounts</span>';return;}if(!selAccId||!accs.find(function(a){return a.id===selAccId;}))selAccId=accs[0].id;el.innerHTML=accs.map(function(a){return '<button class="acc-chip'+(selAccId===a.id?' active':'')+'" onclick="selAccId=\''+a.id+'\';renderAccs()">'+a.name+'</button>';}).join('');}
 
@@ -658,10 +663,27 @@ function qlSearch(q){
   renderList();
 }
 
+var _viewAll=false;
+function toggleViewAll(){
+  _viewAll=!_viewAll;
+  var btn=document.getElementById('viewAllBtn');
+  if(btn)btn.textContent=_viewAll?'Today':'All';if(btn)btn.style.color=_viewAll?'var(--blue)':'var(--tx2)';
+  if(btn)btn.style.color=_viewAll?'var(--blue)':'var(--tx2)';
+  renderList();
+}
+
+var _qlSearchQ='';
+function filterQLList(q){
+  _qlSearchQ=(q||'').toLowerCase().trim();
+  renderList();
+}
+
 function renderList(){
   var dv=document.getElementById('expDate').value||todayStr(),parts=dv.split('-');
   var selDay=parseInt(parts[2]),selMonth=parts[0]+'-'+parts[1];
+  var listTitleEl=document.getElementById('todayTitle');if(listTitleEl)listTitleEl.textContent=_viewAll?'All expenses':'Today';
   var todayExps=D.expenses.filter(function(e){
+    if(_viewAll){if(_qlSearchQ){var mm=e.name.toLowerCase().indexOf(_qlSearchQ)>-1||(e.note&&e.note.toLowerCase().indexOf(_qlSearchQ)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(_qlSearchQ)>-1);if(!mm)return false;}return true;}
     if(_qlSearchQ){
       var matches=e.name.toLowerCase().indexOf(_qlSearchQ)>-1||(e.note&&e.note.toLowerCase().indexOf(_qlSearchQ)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(_qlSearchQ)>-1)||e.cat.toLowerCase().indexOf(_qlSearchQ)>-1;
       if(!matches)return false;
@@ -676,7 +698,7 @@ function renderList(){
   var d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
   document.getElementById('todayTitle').textContent=d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'});
   var ts='';if(incTotal>0)ts='+'+fmt(incTotal);if(expTotal>0)ts+=(ts?' | ':'')+'-'+fmt(expTotal);
-  document.getElementById('todayTotal').textContent=ts;
+  document.getElementById('todayTotal').textContent=_viewAll?(todayExps.length+todayInc.length+' items · '+ts):ts;
   if(!todayExps.length&&!todayInc.length){el.innerHTML='<div class="empty-state"><div style="font-size:36px;margin-bottom:6px">🧾</div>Nothing logged yet</div>';return;}
   var dateStr=d.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
   var incHtml=todayInc.slice().reverse().map(function(e){
@@ -686,7 +708,7 @@ function renderList(){
     return '<div class="swipe-wrap" data-id="'+e.id+'" data-type="income">'+inner+'<div class="swipe-bg"><span class="del-ico">🗑</span></div></div>';
   }).join('');
   var expHtml=todayExps.slice().reverse().map(function(e){
-    var c=getQLCatColor(e.cat),ico=(CATS.find(function(x){return x.key===e.cat;})||{icon:'📦'}).icon;
+    var c=getQLCatColor(e.cat),ico=(getQLCats().find(function(x){return x.key===e.cat;})||{icon:'📦'}).icon;
     var meta=dateStr+' · '+e.cat+(e.note?' · '+e.note:'');
     var inner='<div class="exp-item" onclick="openEditModal(\''+e.id+'\',\'expense\')"><div class="exp-left"><div class="exp-dot" style="background:'+c+'22">'+ico+'</div><div class="exp-info"><div class="exp-name">'+e.name+'</div><div class="exp-meta">'+meta+'</div></div></div><div class="exp-right"><span class="exp-amt" style="color:'+c+'">'+fmt(e.amt)+'</span></div></div>';
     return '<div class="swipe-wrap" data-id="'+e.id+'" data-type="expense">'+inner+'<div class="swipe-bg"><span class="del-ico">🗑</span></div></div>';
@@ -773,7 +795,7 @@ function renderPhoneBudgets(){
   el.innerHTML=h;
 }
 /* -- DAILY LIMIT & OCCASIONS -- */
-function saveDailyLimit(v){localStorage.setItem(LSDLIMIT,parseFloat(v)||0);renderMonthBar();}
+function saveDailyLimit(v){var amt=parseFloat(v)||0;localStorage.setItem(LSDLIMIT,amt);if(!D.config)D.config={};D.config.dailyLimit=amt;autoSave();renderMonthBar();renderQLScore();}
 function renderOccasions(){
   if(!D.occasions)D.occasions=[];
   var el=document.getElementById('occasionRow');if(!el)return;
@@ -799,6 +821,16 @@ function promptAddOccasion(){
   D.occasions.push({id:Date.now().toString(),name:name.trim(),budget:budget,icon:ico});
   autoSave();renderOccasions();
 }
+function pendingLentTotal(){return (D.lent||[]).filter(function(l){return !l.returned;}).reduce(function(s,l){return s+l.amt;},0);}
+function updateLentAlertQL(){
+  var badge=document.getElementById('lentAlertBadge');if(!badge)return;
+  var pending=(D.lent||[]).filter(function(l){return !l.returned;});
+  var overdue=pending.filter(function(l){return l.returnBy&&new Date(l.returnBy)<new Date();});
+  if(overdue.length){badge.style.display='inline-block';badge.textContent='💸 '+overdue.length+' overdue';}
+  else if(pending.length){badge.style.display='inline-block';badge.style.background='var(--amber)';badge.textContent='💸 '+pending.length;}
+  else{badge.style.display='none';}
+}
+
 function renderMonthBar(){
   var now=new Date(),m=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   var monthExps=D.expenses.filter(function(e){return e.month===m;});
@@ -807,7 +839,7 @@ function renderMonthBar(){
   var incTotal=monthInc.reduce(function(s,e){return s+e.amt;},0);
   var label=now.toLocaleString('en-IN',{month:'long'});
   document.getElementById('monthBarLabel').textContent=label;
-  document.getElementById('monthBarVal').textContent=spent>0?'-'+fmt(spent):'';
+  var mExpCount=(D.expenses||[]).filter(function(e){return e.month===m;}).length;document.getElementById('monthBarVal').textContent=spent>0?'-'+fmt(spent)+' ('+mExpCount+')':'';
   document.getElementById('monthBarInc').textContent=incTotal>0?'+'+fmt(incTotal)+' ':'';
   /* Daily limit bar */
   var limit=parseFloat(localStorage.getItem(LSDLIMIT)||0);
@@ -832,7 +864,7 @@ function updateCopyLast(){
   var last=D.expenses.length?D.expenses[D.expenses.length-1]:null;
   if(!last){btn.style.display='none';return;}
   btn.style.display='block';
-  var ico=(CATS.find(function(c){return c.key===last.cat;})||{icon:'📦'}).icon;
+  var ico=(getQLCats().find(function(c){return c.key===last.cat;})||{icon:'📦'}).icon;
   btn.textContent='↩ Repeat: '+ico+' '+last.name+' '+fmt(last.amt);
 }
 function copyLast(){
@@ -855,7 +887,7 @@ function openEditModal(id,type){
   document.getElementById('editNote').value=e.note||'';
   document.getElementById('editAmt').value=e.amt||'';
   var catSel=document.getElementById('editCat');
-  catSel.innerHTML=CATS.map(function(c){return '<option value="'+c.key+'"'+(e.cat===c.key?' selected':'')+'>'+c.icon+' '+c.key+'</option>';}).join('');
+  var _editCats=getQLCats();catSel.innerHTML=_editCats.map(function(c){return '<option value="'+c.key+'"'+(e.cat===c.key?' selected':'')+'>'+c.icon+' '+c.key+'</option>';}).join('');
   catSel.style.display=type==='expense'?'':'none';
   document.getElementById('editCat').closest('.modal-field').style.display=type==='expense'?'':'none';
   var accSel=document.getElementById('editAcc');
@@ -981,7 +1013,7 @@ function addLentQL(){
   document.getElementById('expName').value='';amtStr='';updateAmt();
   if(navigator.vibrate)navigator.vibrate(50);
   showToast('Lent '+fmt(amt)+' to '+name,'success');
-  renderList();
+  renderList();updateLentAlertQL();
 }
 
 function handleAdd(){if(mode==='income')addIncome();else if(mode==='lent')addLentQL();else addExpense();}
@@ -994,16 +1026,21 @@ function addIncome(){
   D.extraIncome.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,source:selIncomeSrc,amt:amt,accountId:selAccId});
   localStorage.setItem(LSDATE,dv);
   autoSave();document.getElementById('expName').value='';document.getElementById('expNote').value='';
-  var te=document.getElementById('expTags');if(te)te.value='';amtStr='';updateAmt();
+  var te=document.getElementById('expTags');if(te)te.value='';amtStr='';updateAmt();selIncomeSrc='Pocket Money';renderIncSources();
   document.activeElement&&document.activeElement.blur();
   renderList();renderMonthBar();
   if(navigator.vibrate)navigator.vibrate(50);
   showToast('+'+fmt(amt)+' income added!','success');renderQLScore();
 }
-function deleteIncome(id){D.extraIncome=D.extraIncome.filter(function(e){return e.id!==id;});autoSave();renderList();}
 function showToast(msg,type){var el=document.getElementById('toast');el.textContent=msg;el.className='toast '+(type||'');void el.offsetWidth;el.classList.add('show');if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove('show');},2200);}
 document.addEventListener('DOMContentLoaded',function(){var dateEl=document.getElementById('expDate');if(dateEl)dateEl.addEventListener('change',function(){localStorage.setItem(LSDATE,this.value);renderList();renderMonthBar();});});
 (function(){var saved=localStorage.getItem(FBKEY);if(saved){try{initFirebase(JSON.parse(saved));}catch(e){localStorage.removeItem(FBKEY);}}})();
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.activeElement&&document.activeElement.id==='expName'){
+    handleAdd();
+  }
+});
 </script>
 </body>
 </html>
