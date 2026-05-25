@@ -710,7 +710,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <div class="modal-box">
     <div class="modal-hd"><span class="modal-title">Edit Fixed Expense</span><button class="modal-cls" onclick="closeEditFixed()">×</button></div>
     <div class="irow"><input type="text" id="efName" placeholder="Name" style="flex:2"><input type="number" id="efAmt" placeholder="₹ Amount" style="max-width:130px"></div>
-    <div class="irow"><select id="efFreq" style="max-width:110px"><option>Daily</option><option>Weekly</option><option>Monthly</option><option>Yearly</option></select><input type="number" type="date" id="efDueDay" style="max-width:160px"><label class="chkrow"><input type="checkbox" id="efRecur"> Remind</label><label class="chkrow"><input type="checkbox" id="efAutoLog"> Auto-log</label></div>
+    <div class="irow"><select id="efFreq" style="max-width:110px"><option>Daily</option><option>Weekly</option><option>Monthly</option><option>Yearly</option></select><input type="date" id="efDueDay" style="max-width:160px"><label class="chkrow"><input type="checkbox" id="efRecur"> Remind</label><label class="chkrow"><input type="checkbox" id="efAutoLog"> Auto-log</label></div>
     <div class="irow"><select id="efCat" style="max-width:140px"></select><select id="efAccId" style="max-width:150px"></select></div>
     <button class="btn" style="width:100%;margin-top:8px" onclick="saveEditFixed()">Save changes</button>
   </div>
@@ -837,7 +837,7 @@ function showToast(msg,type){
 }
 
 var db=null,saveTimer=null,curDate=new Date(),selDay=null,_toastTimer=null;
-var _rangeFrom=null,_rangeTo=null,_qFilterMode='all',_histRangeMonths=6,_fixedSearch='',_fixedSort='default',_bulkSelected=[];
+var _rangeFrom=null,_rangeTo=null,_qFilterMode='all',_histRangeMonths=6,_fixedSearch='',_fixedSort='default',_bulkSelected=new Set();
 var _isSaving=false; /* BUG FIX: prevent listener overwrite during save */
 var _cat=null,_alloc=null,_trend=null,_hist=null,_acc=null;
 /* CC kept for legacy; use getCatColor() for full support including custom cats */
@@ -1191,7 +1191,9 @@ function renderAccounts(){
 }
 function populateAccSel(){var accs=D.accounts,sel=document.getElementById('expAcc');
   var fixAccSel=document.getElementById('fixAccId');
-  if(fixAccSel)fixAccSel.innerHTML=accs.length?accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join(''):'<option value="">No accounts</option>';sel.innerHTML=accs.length?accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join(''):'<option value="">No accounts</option>';}
+  if(fixAccSel)fixAccSel.innerHTML=accs.length?accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join(''):'<option value="">No accounts</option>';sel.innerHTML=accs.length?accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join(''):'<option value="">No accounts</option>';
+  var aeFilter=document.getElementById('expAccFilter');if(aeFilter)aeFilter.innerHTML='<option value="">All accounts</option>'+accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join('');
+}
 
 /* ═══ EXPENSES ═══ */
 
@@ -1251,7 +1253,7 @@ function renderCustomCategories(){
 function populateCatSelects(){
   var cats=getAllCategories();
   var opts=cats.map(function(c){return '<option>'+c.name+'</option>';}).join('');
-  ['expCat','budgetCat','editCat','fixCat'].forEach(function(id){var el=document.getElementById(id);if(el){var prev=el.value;el.innerHTML=opts;if(prev)el.value=prev;}});
+  ['expCat','budgetCat','editCat','fixCat','efCat'].forEach(function(id){var el=document.getElementById(id);if(el){var prev=el.value;el.innerHTML=opts;if(prev)el.value=prev;}});
 }
 
 function addExpense(){
@@ -1264,7 +1266,6 @@ function addExpense(){
   D.expenses.push({id:Date.now().toString(),date:ed,month:m,name:name,cat:cat,amt:amt,accountId:accId,note:note,tags:tags});
   autoSave();
   document.getElementById('expName').value='';document.getElementById('expAmt').value='';
-  document.getElementById('expDate').value=todayStr();
   document.getElementById('expDate').value=todayStr();
   if(document.getElementById('expNote'))document.getElementById('expNote').value='';
   if(document.getElementById('expTags'))document.getElementById('expTags').value='';
@@ -1380,7 +1381,7 @@ function renderExpenses(textFilter,dateFilter){
     var msg=dateFilter?'No expenses on '+new Date(dateFilter+'T12:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'}):(textFilter?'No results for "'+textFilter+'"':'No expenses this month.');
     el.innerHTML='<p class="empty">'+msg+'</p>';renderBudgetBars();checkBudgetAlerts();return;
   }
-  el.innerHTML=arr.slice().reverse().map(function(e){var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{month:'short',day:'numeric'}),acc=accs.find(function(a){return a.id===e.accountId;});var tagHtml='';if(e.tags){e.tags.split(' ').filter(Boolean).forEach(function(t){tagHtml+='<span style="display:inline-block;background:var(--bbg,#E6F1FB);color:var(--blue,#185FA5);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:3px">'+t+'</span>';});}
+  el.innerHTML=arr.map(function(e){var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{month:'short',day:'numeric'}),acc=accs.find(function(a){return a.id===e.accountId;});var tagHtml='';if(e.tags){e.tags.split(' ').filter(Boolean).forEach(function(t){tagHtml+='<span style="display:inline-block;background:var(--bbg,#E6F1FB);color:var(--blue,#185FA5);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:3px">'+t+'</span>';});}
     var noteHtml=e.note?'<div style="font-size:11px;color:var(--tx3);font-style:italic">📝 '+e.note+'</div>':'';
     return '<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span><button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="del-btn" onclick="removeExpense(\''+e.id+'\')">×</button></div></div>';}).join('');
   renderBudgetBars();checkBudgetAlerts();
