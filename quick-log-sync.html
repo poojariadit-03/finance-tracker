@@ -239,6 +239,7 @@ input[type=date]:focus{border-color:var(--green)}
     <div class="hdr">
       <div class="sync-dot" id="syncDot"></div>
       <span style="font-size:12px;color:var(--tx3)" id="syncLabel">Synced</span>
+      <span id="lentAlertBadge" style="display:none;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px"></span>
       <button style="background:none;border:none;color:var(--tx3);font-size:18px;cursor:pointer;padding:4px" onclick="disconnectFirebase()">⚙️</button>
     </div>
   </div>
@@ -333,17 +334,13 @@ input[type=date]:focus{border-color:var(--green)}
     </div>
     <button class="copy-last-btn" id="copyLastBtn" onclick="copyLast()" style="display:none"></button>
     <button class="add-btn" id="addBtn" onclick="handleAdd()">+ Add Expense</button>
-    <div class="ql-search-wrap" style="margin-bottom:10px">
-      <span class="ql-search-ico">🔍</span>
-      <input type="text" class="ql-search-input" id="qlSearchInput" placeholder="Search today's entries..." oninput="filterQLList(this.value)">
-    </div>
     <div class="today-header">
       <div style="display:flex;align-items:center;gap:8px"><span class="today-title" id="todayTitle">Today</span><button onclick="toggleViewAll()" id="viewAllBtn" style="background:none;border:1px solid var(--bdr);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:500;color:var(--tx2);cursor:pointer;font-family:inherit;transition:all .15s">All</button></div>
       <span class="today-total" id="todayTotal"></span>
     </div>
         <div class="ql-search-wrap">
       <span class="ql-search-ico">🔍</span>
-      <input type="text" class="ql-search-input" id="qlSearchInput" placeholder="Search expenses..." oninput="qlSearch(this.value)">
+      <input type="text" class="ql-search-input" id="qlSearchInput" placeholder="Search expenses..." oninput="filterQLList(this.value)">
     </div>
     <div id="expList"></div>
     <div id="phoneBudgets"></div>
@@ -425,11 +422,11 @@ function loadFromFirebase(){
   document.getElementById('loadingTxt').textContent='Loading your data...';
   db.ref('finances/data').once('value').then(function(snap){
     var val=snap.val();
-    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];if(!D.lent)D.lent=[];}catch(e){}}
+    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];if(!D.budgets)D.budgets={};}catch(e){}}
     if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];
     document.getElementById('loading').style.display='none';document.getElementById('app').style.display='block';
     initUI();setSyncStatus('synced');
-    db.ref('finances/data').on('value',function(snap){var v=snap.val();if(v){try{var fresh=JSON.parse(v);if(!fresh.extraIncome)fresh.extraIncome=[];if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.occasions)fresh.occasions=[];if(!fresh.liabilities)fresh.liabilities=[];if(!fresh.lent)fresh.lent=[];if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;renderAccs();renderList();}}catch(e){}}});
+    db.ref('finances/data').on('value',function(snap){var v=snap.val();if(v){try{var fresh=JSON.parse(v);if(!fresh.extraIncome)fresh.extraIncome=[];if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.occasions)fresh.occasions=[];if(!fresh.liabilities)fresh.liabilities=[];if(!fresh.lent)fresh.lent=[];if(!fresh.transfers)fresh.transfers=[];if(!fresh.budgets)fresh.budgets={};if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();}}catch(e){}}});
   }).catch(function(e){document.getElementById('loadingTxt').textContent='Error: '+e.message;});
 }
 
@@ -657,13 +654,11 @@ function deleteIncome(id){
   showUndoToast('Deleted "'+undoStack.item.name+'"');
 }
 
-var _qlSearchQ = '';
-function qlSearch(q){
-  _qlSearchQ = q.toLowerCase().trim();
+var _qlSearchQ='';
+function filterQLList(q){
+  _qlSearchQ=(q||'').toLowerCase().trim();
   renderList();
 }
-
-var _viewAll=false;
 function toggleViewAll(){
   _viewAll=!_viewAll;
   var btn=document.getElementById('viewAllBtn');
@@ -672,16 +667,11 @@ function toggleViewAll(){
   renderList();
 }
 
-var _qlSearchQ='';
-function filterQLList(q){
-  _qlSearchQ=(q||'').toLowerCase().trim();
-  renderList();
-}
-
+var _viewAll=false;
 function renderList(){
   var dv=document.getElementById('expDate').value||todayStr(),parts=dv.split('-');
   var selDay=parseInt(parts[2]),selMonth=parts[0]+'-'+parts[1];
-  var listTitleEl=document.getElementById('todayTitle');if(listTitleEl)listTitleEl.textContent=_viewAll?'All expenses':'Today';
+  var listTitleEl=document.getElementById('todayTitle');
   var todayExps=D.expenses.filter(function(e){
     if(_viewAll){if(_qlSearchQ){var mm=e.name.toLowerCase().indexOf(_qlSearchQ)>-1||(e.note&&e.note.toLowerCase().indexOf(_qlSearchQ)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(_qlSearchQ)>-1);if(!mm)return false;}return true;}
     if(_qlSearchQ){
@@ -691,12 +681,15 @@ function renderList(){
     }
     return e.month===selMonth&&new Date(e.date).getDate()===selDay;
   });
-  var todayInc=(D.extraIncome||[]).filter(function(e){return e.month===selMonth&&new Date(e.date).getDate()===selDay;});
+  var todayInc=(D.extraIncome||[]).filter(function(e){
+    if(_viewAll){if(_qlSearchQ){var mm=e.name.toLowerCase().indexOf(_qlSearchQ)>-1||(e.note&&e.note.toLowerCase().indexOf(_qlSearchQ)>-1);if(!mm)return false;}return true;}
+    return e.month===selMonth&&new Date(e.date).getDate()===selDay;
+  });
   var el=document.getElementById('expList');
   var expTotal=todayExps.reduce(function(s,e){return s+e.amt;},0);
   var incTotal=todayInc.reduce(function(s,e){return s+e.amt;},0);
   var d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
-  document.getElementById('todayTitle').textContent=d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'});
+  if(listTitleEl)listTitleEl.textContent=_viewAll?'All entries':d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'});
   var ts='';if(incTotal>0)ts='+'+fmt(incTotal);if(expTotal>0)ts+=(ts?' | ':'')+'-'+fmt(expTotal);
   document.getElementById('todayTotal').textContent=_viewAll?(todayExps.length+todayInc.length+' items · '+ts):ts;
   if(!todayExps.length&&!todayInc.length){el.innerHTML='<div class="empty-state"><div style="font-size:36px;margin-bottom:6px">🧾</div>Nothing logged yet</div>';return;}
