@@ -1302,6 +1302,9 @@ function renderExpenseAnalytics(arr){
 var _expSort='date-desc';
 function setExpSort(mode,btn){
   _expSort=mode;
+  /* BUG FIX: sync the dropdown so renderExpenses reads the right sort mode */
+  var sel=document.getElementById('expSortSel');
+  if(sel)sel.value=mode;
   document.querySelectorAll('.sort-btn').forEach(function(b){b.classList.remove('active');});
   if(btn)btn.classList.add('active');
   renderExpenses(document.getElementById('expSearch').value||undefined);
@@ -1381,9 +1384,15 @@ function renderExpenses(textFilter,dateFilter){
     var msg=dateFilter?'No expenses on '+new Date(dateFilter+'T12:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'}):(textFilter?'No results for "'+textFilter+'"':'No expenses this month.');
     el.innerHTML='<p class="empty">'+msg+'</p>';renderBudgetBars();checkBudgetAlerts();return;
   }
+  /* BUG FIX: clear stale bulk selection when list re-renders */
+  _bulkSelected.clear();updateBulkBar();
   el.innerHTML=arr.map(function(e){var c=getCatColor(e.cat),d=new Date(e.date).toLocaleDateString('en-IN',{month:'short',day:'numeric'}),acc=accs.find(function(a){return a.id===e.accountId;});var tagHtml='';if(e.tags){e.tags.split(' ').filter(Boolean).forEach(function(t){tagHtml+='<span style="display:inline-block;background:var(--bbg,#E6F1FB);color:var(--blue,#185FA5);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:3px">'+t+'</span>';});}
     var noteHtml=e.note?'<div style="font-size:11px;color:var(--tx3);font-style:italic">📝 '+e.note+'</div>':'';
-    return '<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span><button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="del-btn" onclick="removeExpense(\''+e.id+'\')">×</button></div></div>';}).join('');
+    /* BUG FIX: show Got paid button for reimbursable expenses not yet reimbursed */
+    var isReimb=e.tags&&(e.tags.toLowerCase().indexOf('#reimbursable')>-1||e.tags.toLowerCase().indexOf('reimbursable')>-1);
+    var isReimbursed=e.tags&&e.tags.toLowerCase().indexOf('#reimbursed')>-1;
+    var reimbBtn=isReimb&&!isReimbursed?'<button class="btn-ghost" style="padding:2px 6px;font-size:10px;color:var(--green)" onclick="markReimbursed(this.dataset.id)" data-id="'+e.id+'" title="Mark reimbursed">💸 Got paid</button>':'';
+    return '<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span>'+reimbBtn+'<button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="del-btn" onclick="removeExpense(\''+e.id+'\')">×</button></div></div>';}).join('');
   renderBudgetBars();checkBudgetAlerts();
 }
 
