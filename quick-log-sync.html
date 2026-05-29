@@ -11,6 +11,8 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0F0F0E;--sur:#1C1C1A;--sur2:#2A2A27;--bdr:rgba(255,255,255,.1);--tx:#EEECEA;--tx2:#9E9C97;--tx3:#6B6A65;--green:#1D9E75;--red:#F0997B;--blue:#85B7EB;--amber:#FAC775;}
+body.force-light{--bg:#F7F6F3;--sur:#fff;--sur2:#F1F0EC;--bdr:rgba(0,0,0,.1);--tx:#1A1A18;--tx2:#6B6A65;--tx3:#9E9C97;--green:#1D9E75;--red:#D85A30;--blue:#185FA5;--amber:#BA7517;}
+body.force-dark{--bg:#0F0F0E;--sur:#1C1C1A;--sur2:#2A2A27;--bdr:rgba(255,255,255,.1);--tx:#EEECEA;--tx2:#9E9C97;--tx3:#6B6A65;--green:#1D9E75;--red:#F0997B;--blue:#85B7EB;--amber:#FAC775;}
 html,body{height:100%;font-family:-apple-system,'SF Pro Display','Segoe UI',sans-serif;background:var(--bg);color:var(--tx);font-size:16px;overscroll-behavior:none}
 /* SETUP */
 #setup{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;overflow-y:auto}
@@ -399,7 +401,10 @@ input[type=date]:focus{border-color:var(--green)}
     <div id="an-vs"></div>
     <div id="an-dl"></div>
   </div>
-  <div class="an-section" id="an-days"><div id="an-days-list"></div></div>
+  <div class="an-section" id="an-days">
+    <button onclick="exportQLAnalyseCSV()" style="width:100%;margin-bottom:10px;padding:10px;font-size:13px;font-weight:600;border-radius:10px;cursor:pointer;font-family:inherit;border:1px solid var(--bdr);background:var(--sur2);color:var(--tx2)">⬇ Export filtered results as CSV</button>
+    <div id="an-days-list"></div>
+  </div>
   <div class="an-section" id="an-top"><div id="an-top-list"></div></div>
 </div>
 <div class="undo-toast" id="undoToast">
@@ -581,7 +586,14 @@ function initUI(){
   document.getElementById('expDate').value=todayStr();
   var savedLimit=localStorage.getItem(LSDLIMIT)||'';
   document.getElementById('dailyLimitInput').value=savedLimit;
+  /* Sync theme from Firebase D.config */
+  if(D.config&&D.config.theme){applyQLTheme(D.config.theme);}
   renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();renderQLScore();updateCopyLast();updateLentAlertQL();
+}
+function applyQLTheme(t){
+  document.body.classList.remove('force-light','force-dark');
+  if(t==='light')document.body.classList.add('force-light');
+  if(t==='dark')document.body.classList.add('force-dark');
 }
 function renderCats(){var _allCats=getQLCats();document.getElementById('catGrid').innerHTML=_allCats.map(function(c){return '<div class="cat-btn'+(selCat===c.key?' active':'')+'" onclick="selectCat(\''+c.key+'\')"><div class="cat-icon">'+c.icon+'</div><div class="cat-name">'+c.key+'</div></div>';}).join('');}
 function selectCat(cat){selCat=cat;localStorage.setItem(LSCAT,cat);renderCats();}
@@ -1071,6 +1083,30 @@ function addIncome(){
   renderList();renderMonthBar();
   if(navigator.vibrate)navigator.vibrate(50);
   showToast('+'+fmt(amt)+' income added!','success');renderQLScore();
+}
+function exportQLAnalyseCSV(){
+  var selMonth=document.getElementById('an-month').value||(new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
+  var selCat=document.getElementById('an-cat').value;
+  var selAccVal=document.getElementById('an-acc').value;
+  var selSearch=(document.getElementById('an-search').value||'').toLowerCase().trim();
+  var arr=D.expenses.filter(function(e){
+    if(e.month!==selMonth)return false;
+    if(selCat&&e.cat!==selCat)return false;
+    if(selAccVal&&e.accountId!==selAccVal)return false;
+    if(selSearch&&e.name.toLowerCase().indexOf(selSearch)<0&&e.cat.toLowerCase().indexOf(selSearch)<0&&(!e.note||e.note.toLowerCase().indexOf(selSearch)<0))return false;
+    return true;
+  });
+  if(!arr.length){showToast('No data to export','error');return;}
+  var rows=[['Date','Description','Category','Amount (₹)','Note']];
+  arr.sort(function(a,b){return new Date(a.date)-new Date(b.date);}).forEach(function(e){
+    rows.push([new Date(e.date).toLocaleDateString('en-IN'),e.name,e.cat,e.amt.toFixed(2),e.note||'']);
+  });
+  var total=arr.reduce(function(s,e){return s+e.amt;},0);
+  rows.push(['','TOTAL','',total.toFixed(2),'']);
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n'));
+  a.download='analyse-'+selMonth+(selCat?'-'+selCat:'')+'.csv';a.click();
+  showToast('Exported '+arr.length+' expenses','success');
 }
 function toggleAnalyse(){
   var p=document.getElementById('anPanel'),content=document.getElementById('qlContent');
