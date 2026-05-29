@@ -347,8 +347,9 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   </div>
   <div class="mnav">
     <button onclick="changeMonth(-1)">&#8249;</button>
-    <span id="monthLabel">—</span>
+    <span id="monthLabel" onclick="jumpToToday()" style="cursor:pointer" title="Click to go to current month">—</span>
     <button onclick="changeMonth(1)">&#8250;</button>
+    <button id="todayNavBtn" onclick="jumpToToday()" style="display:none;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--gbg);color:var(--green);border-color:var(--green)">Today</button>
   </div>
   <div class="hd-right">
     <div class="gsearch-wrap">
@@ -975,7 +976,14 @@ function changeMonth(dir){
   var rr=document.getElementById('rangeResult');if(rr)rr.style.display='none';
   document.querySelectorAll('.qpill').forEach(function(p){p.classList.remove('active');});
   var first=document.querySelector('.qpill');if(first)first.classList.add('active');curDate=new Date(curDate.getFullYear(),curDate.getMonth()+dir,1);selDay=null;_qFilterMode='all';var pills=document.querySelectorAll('.qpill');if(pills.length){pills.forEach(function(p){p.classList.remove('active');});pills[0].classList.add('active');}updateHeader();renderAll();}
-function updateHeader(){document.getElementById('monthLabel').textContent=curDate.toLocaleString('default',{month:'short',year:'numeric'});}
+function updateHeader(){
+  document.getElementById('monthLabel').textContent=curDate.toLocaleString('default',{month:'short',year:'numeric'});
+  var now=new Date();
+  var isCurrentMonth=curDate.getFullYear()===now.getFullYear()&&curDate.getMonth()===now.getMonth();
+  var btn=document.getElementById('todayNavBtn');
+  if(btn)btn.style.display=isCurrentMonth?'none':'block';
+}
+function jumpToToday(){curDate=new Date();selDay=null;updateHeader();renderAll();}
 function switchTab(n){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===n);});
   document.querySelectorAll('.tab-content').forEach(function(c){c.classList.toggle('active',c.id==='tab-'+n);});
