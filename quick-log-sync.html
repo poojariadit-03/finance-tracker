@@ -276,7 +276,7 @@ input[type=date]:focus{border-color:var(--green)}
       <div class="dlb-track"><div class="dlb-fill" id="dlbFill"></div></div>
     </div>
   </div>
-  <div class="content">
+  <div class="content" id="qlContent">
     <div class="ql-score-bar" id="qlScoreBar" onclick="switchTab && switchTab('overview')">
       <div class="ql-score-num" id="qlScoreNum" style="color:var(--green)">—</div>
       <div class="ql-score-right">
@@ -377,6 +377,10 @@ input[type=date]:focus{border-color:var(--green)}
   </div>
 </div>
 <div class="an-panel" id="anPanel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <span style="font-size:16px;font-weight:700">📊 Analyse</span>
+    <button onclick="toggleAnalyse()" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--tx2);cursor:pointer;font-family:inherit">← Back</button>
+  </div>
   <div class="an-filter">
     <select id="an-month"></select>
     <select id="an-cat"><option value="">All categories</option><option>Food</option><option>Transport</option><option>Shopping</option><option>Health</option><option>Entertainment</option><option>Utilities</option><option>Education</option><option>Other</option></select>
@@ -1068,10 +1072,10 @@ function addIncome(){
   showToast('+'+fmt(amt)+' income added!','success');renderQLScore();
 }
 function toggleAnalyse(){
-  var p=document.getElementById('anPanel'),app=document.getElementById('app');
+  var p=document.getElementById('anPanel'),content=document.getElementById('qlContent');
   var open=p.classList.contains('show');
   p.classList.toggle('show',!open);
-  app.style.display=open?'block':'none';
+  if(content)content.style.display=open?'block':'none';
   if(!open)initQLAnalyse();
 }
 function switchAnPill(sec,btn){
