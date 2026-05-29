@@ -528,8 +528,8 @@ function fmt(n){var a=Math.abs(Number(n));return (Number(n)<0?'-':'')+'₹'+(a>=
 function initUI(){
   if(!D.extraIncome)D.extraIncome=[];
   if(!D.occasions)D.occasions=[];
-  var lastDate=localStorage.getItem(LSDATE)||todayStr();
-  document.getElementById('expDate').value=lastDate;
+  /* Always start on today — never restore a stale date from localStorage */
+  document.getElementById('expDate').value=todayStr();
   var savedLimit=localStorage.getItem(LSDLIMIT)||'';
   document.getElementById('dailyLimitInput').value=savedLimit;
   renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();renderQLScore();updateCopyLast();updateLentAlertQL();
@@ -583,7 +583,6 @@ function addExpense(forceOverride){
   var parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
   var tags=document.getElementById('expTags')?document.getElementById('expTags').value.trim():'';
   D.expenses.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,tags:tags,cat:selCat,amt:amt,accountId:selAccId,occasion:selOccasion});
-  localStorage.setItem(LSDATE,dv);
   autoSave();
   document.getElementById('expName').value='';document.getElementById('expNote').value='';
   var te=document.getElementById('expTags');if(te)te.value='';
@@ -1017,7 +1016,6 @@ function addIncome(){
   var parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
   if(!D.extraIncome)D.extraIncome=[];
   D.extraIncome.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,source:selIncomeSrc,amt:amt,accountId:selAccId});
-  localStorage.setItem(LSDATE,dv);
   autoSave();document.getElementById('expName').value='';document.getElementById('expNote').value='';
   var te=document.getElementById('expTags');if(te)te.value='';amtStr='';updateAmt();selIncomeSrc='Pocket Money';renderIncSources();
   document.activeElement&&document.activeElement.blur();
@@ -1026,8 +1024,12 @@ function addIncome(){
   showToast('+'+fmt(amt)+' income added!','success');renderQLScore();
 }
 function showToast(msg,type){var el=document.getElementById('toast');el.textContent=msg;el.className='toast '+(type||'');void el.offsetWidth;el.classList.add('show');if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove('show');},2200);}
-document.addEventListener('DOMContentLoaded',function(){var dateEl=document.getElementById('expDate');if(dateEl)dateEl.addEventListener('change',function(){localStorage.setItem(LSDATE,this.value);renderList();renderMonthBar();});});
-(function(){var saved=localStorage.getItem(FBKEY);if(saved){try{initFirebase(JSON.parse(saved));}catch(e){localStorage.removeItem(FBKEY);}}})();
+document.addEventListener('DOMContentLoaded',function(){var dateEl=document.getElementById('expDate');if(dateEl)dateEl.addEventListener('change',function(){renderList();renderMonthBar();});});
+(function(){
+  /* Clear any persisted date so the app always opens on today */
+  localStorage.removeItem('ql_last_date');
+  var saved=localStorage.getItem(FBKEY);if(saved){try{initFirebase(JSON.parse(saved));}catch(e){localStorage.removeItem(FBKEY);}}
+})();
 
 document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&document.activeElement&&document.activeElement.id==='expName'){
