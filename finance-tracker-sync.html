@@ -491,7 +491,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
 </div>
 <div class="tab-content" id="tab-expenses">
   <div class="card">
-    <div class="card-hd"><span class="ctitle">💰 Category budgets</span><div style="display:flex;gap:8px;align-items:center"><label style="font-size:12px;color:var(--tx2);display:flex;align-items:center;gap:5px"><input type="checkbox" id="budgetCarryover" onchange="D.config.budgetCarryover=this.checked;autoSave();renderBudgetBars();"> Carry over unused</label><button class="btn-ghost" onclick="toggleForm('budget-form')">+ Set budget</button></div></div>
+    <div class="card-hd"><span class="ctitle">💰 Category budgets</span><div style="display:flex;gap:8px;align-items:center"><label style="font-size:12px;color:var(--tx2);display:flex;align-items:center;gap:5px"><input type="checkbox" id="budgetCarryover" onchange="D.config.budgetCarryover=this.checked;autoSave();renderBudgetBars();"> Carry over unused</label><button class="btn-ghost" onclick="copyLastMonthBudget()">📋 Copy last month</button><button class="btn-ghost" onclick="toggleForm('budget-form')">+ Set budget</button></div></div>
     <div id="budget-form" style="display:none;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bdr)">
       <div class="irow">
         <select id="budgetCat" style="max-width:150px" onchange="updateBudgetHint()"></select>
@@ -759,6 +759,11 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     </div>
     <div id="nw-liab-list"><p class="empty">No liabilities. Great!</p></div>
   </div>
+  <div class="card">
+    <div class="card-hd"><span class="ctitle">Net Worth trend</span><span style="font-size:11px;color:var(--tx3)">Snapshots over time</span></div>
+    <div style="position:relative;height:180px"><canvas id="nwTrendChart"></canvas></div>
+    <div id="nw-trend-empty" style="font-size:13px;color:var(--tx3);text-align:center;padding:12px 0;display:none">Open this tab each month to build your trend.</div>
+  </div>
 </div>
 <div class="tab-content" id="tab-lent">
   <div class="mgrid">
@@ -802,7 +807,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   </div>
   <div class="mgrid" id="an-metrics"></div>
   <div class="card"><div class="card-hd"><span class="ctitle">Where money went</span></div><div id="an-cats"></div></div>
-  <div class="card"><div class="card-hd"><span class="ctitle">Day-by-day breakdown</span></div><div id="an-days"></div></div>
+  <div class="card"><div class="card-hd"><span class="ctitle">Day-by-day breakdown</span><button class="btn-ghost" onclick="exportAnalyseCSV()">⬇ CSV</button></div><div id="an-days"></div></div>
   <div class="card" id="an-dl-card" style="display:none"><div class="card-hd"><span class="ctitle" id="an-dl-title">Daily limit</span></div><div id="an-dl"></div></div>
   <div class="card"><div class="card-hd"><span class="ctitle">vs previous month</span></div><div id="an-vs"></div></div>
   <div class="card"><div class="card-hd"><span class="ctitle">Biggest expenses</span></div><div id="an-top"></div></div>
@@ -1585,6 +1590,24 @@ function updateBudgetHint(){
 
 function saveBudget(){var cat=document.getElementById('budgetCat').value,amt=parseFloat(document.getElementById('budgetAmt').value);if(!cat||isNaN(amt)||amt<0)return;if(amt===0)delete D.budgets[cat];else D.budgets[cat]=amt;autoSave();document.getElementById('budgetAmt').value='';renderBudgetBars();checkBudgetAlerts();}
 function clearBudget(){delete D.budgets[document.getElementById('budgetCat').value];autoSave();renderBudgetBars();checkBudgetAlerts();}
+function copyLastMonthBudget(){
+  var lastDate=new Date(curDate.getFullYear(),curDate.getMonth()-1,1);
+  var lastM=lastDate.getFullYear()+'-'+String(lastDate.getMonth()+1).padStart(2,'0');
+  /* Get last month's actual spending by category as a suggested budget */
+  var lastExps=D.expenses.filter(function(e){return e.month===lastM;});
+  if(!lastExps.length&&!Object.keys(D.budgets).length){showToast('No last month data to copy','error');return;}
+  /* If budgets exist, copy them; otherwise suggest from last month spending */
+  var source=Object.keys(D.budgets).length?D.budgets:null;
+  if(source){
+    /* budgets already set — just confirm copy */
+    if(!confirm('This will keep your current budgets. They are already set. Use last month\'s spending as new budgets instead?'))return;
+  }
+  var cats={};lastExps.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
+  if(!Object.keys(cats).length){showToast('No spending last month to copy from','error');return;}
+  Object.keys(cats).forEach(function(cat){D.budgets[cat]=Math.ceil(cats[cat]/100)*100;});
+  autoSave();renderBudgetBars();checkBudgetAlerts();
+  showToast('Budgets set from last month\'s spending','success');
+}
 function renderBudgetBars(){
   var budgets=D.budgets,cats=Object.keys(budgets),el=document.getElementById('budgetBars');
   if(!cats.length){el.innerHTML='<p class="empty" style="margin-bottom:4px">No budgets set. Click &ldquo;+ Set budget&rdquo; to add limits.</p>';return;}
@@ -2007,6 +2030,25 @@ function renderNetWorth(){
   var liabEl=document.getElementById('nw-liab-list');
   if(!liabilities.length){liabEl.innerHTML='<p class="empty">No liabilities yet.</p>';return;}
   liabEl.innerHTML=liabilities.map(function(l){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px"><span>'+l.name+'</span><div style="display:flex;align-items:center;gap:8px"><span style="font-family:\'DM Mono\',monospace;font-weight:500;color:var(--red)">'+fmt(l.amt)+'</span><button class="del-btn" onclick="removeLiability(\''+l.id+'\')">×</button></div></div>';}).join('');
+  /* Net Worth Snapshot — save current value keyed by month */
+  if(!D.config.nwSnapshots)D.config.nwSnapshots={};
+  var snapKey=mk();
+  D.config.nwSnapshots[snapKey]=Math.round(netWorth);
+  autoSave();
+  /* Render trend chart */
+  var snapKeys=Object.keys(D.config.nwSnapshots).sort();
+  var snapVals=snapKeys.map(function(k){return D.config.nwSnapshots[k];});
+  var snapLabels=snapKeys.map(function(k){var p=k.split('-');return new Date(parseInt(p[0]),parseInt(p[1])-1,1).toLocaleString('default',{month:'short',year:'2-digit'});});
+  var dark=document.body.classList.contains('force-dark')||(!document.body.classList.contains('force-light')&&matchMedia('(prefers-color-scheme:dark)').matches);
+  var emptyEl=document.getElementById('nw-trend-empty');
+  if(snapKeys.length<2){if(emptyEl)emptyEl.style.display='block';return;}
+  if(emptyEl)emptyEl.style.display='none';
+  if(window._nwChart){try{window._nwChart.destroy();}catch(e){}}
+  window._nwChart=new Chart(document.getElementById('nwTrendChart'),{
+    type:'line',
+    data:{labels:snapLabels,datasets:[{data:snapVals,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,.1)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#1D9E75',tension:0.3,fill:true}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return fmt(ctx.parsed.y);}}}},scales:{x:{grid:{display:false}},y:{grid:{color:dark?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)'},ticks:{callback:function(v){return '₹'+(Math.abs(v)>=100000?(v/100000).toFixed(0)+'L':v>=1000?(v/1000).toFixed(0)+'K':v);}}}}}
+  });
 }
 
 function mElapsed(s){var st=new Date(s),n=new Date();return Math.max(0,(n.getFullYear()-st.getFullYear())*12+(n.getMonth()-st.getMonth()));}
@@ -2240,6 +2282,34 @@ function exportCSV(){
     arr=getExpenses();
   }
   var accs=D.accounts;if(!arr.length){showToast('No expenses this month!','error');return;}var rows=[['Date','Description','Category','Account','Amount (₹)','Note','Tags']];arr.forEach(function(e){var acc=accs.find(function(a){return a.id===e.accountId;});rows.push([new Date(e.date).toLocaleDateString('en-IN'),e.name,e.cat,acc?acc.name:'',e.amt.toFixed(2),e.note||'',e.tags||'']);});var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows.map(function(r){return r.join(',');}).join('\n'));a.download='expenses-'+mk()+'.csv';a.click();}
+function exportAnalyseCSV(){
+  var selMonth=document.getElementById('an-month').value||mk();
+  var selCat=document.getElementById('an-cat').value;
+  var selAcc=document.getElementById('an-acc').value;
+  var selSearch=(document.getElementById('an-search').value||'').toLowerCase().trim();
+  var arr=D.expenses.filter(function(e){
+    if(e.month!==selMonth)return false;
+    if(selCat&&e.cat!==selCat)return false;
+    if(selAcc&&e.accountId!==selAcc)return false;
+    if(selSearch&&e.name.toLowerCase().indexOf(selSearch)<0&&e.cat.toLowerCase().indexOf(selSearch)<0&&(!e.note||e.note.toLowerCase().indexOf(selSearch)<0))return false;
+    return true;
+  });
+  if(!arr.length){showToast('No data to export','error');return;}
+  var accs=D.accounts;
+  var rows=[['Date','Description','Category','Account','Amount (₹)','Note']];
+  arr.sort(function(a,b){return new Date(a.date)-new Date(b.date);}).forEach(function(e){
+    var acc=accs.find(function(a){return a.id===e.accountId;});
+    rows.push([new Date(e.date).toLocaleDateString('en-IN'),e.name,e.cat,acc?acc.name:'',e.amt.toFixed(2),e.note||'']);
+  });
+  var total=arr.reduce(function(s,e){return s+e.amt;},0);
+  rows.push(['','','','','','']);
+  rows.push(['TOTAL','','','',total.toFixed(2),'']);
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n'));
+  a.download='analyse-'+selMonth+(selCat?'-'+selCat:'')+(selSearch?'-'+selSearch:'')+'.csv';
+  a.click();
+  showToast('Exported '+arr.length+' expenses','success');
+}
 
 /* ═══ INIT ═══ */
 /* -- WEEKLY SUMMARY -- */
