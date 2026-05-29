@@ -1972,7 +1972,43 @@ function exportExcel(months){
   (D.lent||[]).forEach(function(l){lt.push([l.name,l.amt,l.date,l.returnBy||'—',l.returned?'Returned':'Pending',l.returnedDate||'—',l.note||'']);});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(lt),'Lent Money');
 
-    XLSX.writeFile(wb,'finance-tracker-'+new Date().toISOString().slice(0,10)+'.xlsx');
+  /* ── Daily Analysis Sheet ── */
+  var dailyLimit=D.config.dailyLimit||0;
+  var da=[['Date','Day','Total Spent','Daily Limit','Status','Over/Under (₹)']];
+  var curM=mk();
+  var curDim=new Date(curDate.getFullYear(),curDate.getMonth()+1,0).getDate();
+  var curNow=new Date();
+  var curIsCur=curNow.getFullYear()===curDate.getFullYear()&&curNow.getMonth()===curDate.getMonth();
+  var curLastDay=curIsCur?curNow.getDate():curDim;
+  var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  for(var di=1;di<=curLastDay;di++){
+    var dd=new Date(curDate.getFullYear(),curDate.getMonth(),di);
+    var daySpent=getExpenses().filter(function(e){return new Date(e.date).getDate()===di;}).reduce(function(s,e){return s+e.amt;},0);
+    var limitSet=dailyLimit>0;
+    var status=!limitSet?'No limit set':(daySpent===0?'No spend':(daySpent<=dailyLimit?'OK':'Over'));
+    var overUnder=limitSet?Math.round(dailyLimit-daySpent):'-';
+    da.push([dd.toLocaleDateString('en-IN'),dayNames[dd.getDay()],Math.round(daySpent),limitSet?dailyLimit:'-',status,overUnder]);
+  }
+  /* Summary rows */
+  if(dailyLimit>0){
+    var daysOver=da.slice(1).filter(function(r){return r[4]==='Over';}).length;
+    var daysOK=da.slice(1).filter(function(r){return r[4]==='OK';}).length;
+    var daysNoSpend=da.slice(1).filter(function(r){return r[4]==='No spend';}).length;
+    var spentVals=da.slice(1).map(function(r){return r[2];}).filter(function(v){return v>0;});
+    var avgDaily=spentVals.length?Math.round(spentVals.reduce(function(s,v){return s+v;},0)/spentVals.length):0;
+    var worstDay=da.slice(1).reduce(function(best,r){return r[2]>best[2]?r:best;},da[1]||[]);
+    da.push(['','','','','','']);
+    da.push(['Summary','']);
+    da.push(['Daily Limit Set',dailyLimit]);
+    da.push(['Days Within Limit',daysOK]);
+    da.push(['Days Over Limit',daysOver]);
+    da.push(['Days No Spend',daysNoSpend]);
+    da.push(['Avg Daily Spend (spend days)',avgDaily]);
+    if(worstDay&&worstDay[0])da.push(['Worst Day',worstDay[0]+' ('+worstDay[1]+')',worstDay[2]]);
+  }
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(da),'Daily Analysis');
+
+  XLSX.writeFile(wb,'finance-tracker-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 function exportCSV(){
@@ -2173,7 +2209,32 @@ function exportReport(months){
   var hRows='';hist.forEach(function(h){hRows+='<tr><td>'+h.label+'</td><td>'+r(h.income)+'</td><td>'+r(h.fxd)+'</td><td>'+r(h.spent)+'</td><td style="color:#1D9E75">'+r(h.savings)+'</td><td style="color:'+(h.balance>=0?'#1D9E75':'#D85A30')+'">'+r(h.balance)+'</td></tr>';});
   var sD='var H='+JSON.stringify(hist)+';var CL='+JSON.stringify(cL)+';var CD='+JSON.stringify(cD)+';var CC2='+JSON.stringify(cC)+';';
   var sC='try{new Chart(document.getElementById("hc"),{type:"bar",data:{labels:H.map(function(d){return d.label;}),datasets:[{data:H.map(function(d){return d.income;}),backgroundColor:"#378ADD",borderRadius:4},{data:H.map(function(d){return d.fxd+d.spent;}),backgroundColor:"#D85A30",borderRadius:4},{data:H.map(function(d){return d.savings;}),backgroundColor:"#1D9E75",borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{ticks:{callback:function(v){return"₹"+(v>=100000?(v/100000).toFixed(0)+"L":v>=1000?(v/1000).toFixed(0)+"K":v);}}}}}});if(CL.length)new Chart(document.getElementById("cc"),{type:"doughnut",data:{labels:CL,datasets:[{data:CD,backgroundColor:CC2,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:"62%",plugins:{legend:{display:false}}}});}catch(e){}';
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report '+mStr+'</title><scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></scr'+'ipt><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#F7F6F3;color:#1A1A18;font-size:15px}.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem}h1{font-size:24px;font-weight:700;margin-bottom:4px}.sub{color:#6B6A65;font-size:14px;margin-bottom:2rem}.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:2rem}.sec{margin-bottom:2rem}.stitle{font-size:11px;font-weight:600;text-transform:uppercase;color:#9E9C97;margin-bottom:10px}.card{background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:1.25rem 1.5rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}.ch{position:relative;height:200px}table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:10px;font-weight:600;text-transform:uppercase;color:#9E9C97;text-align:left;padding:6px 8px;border-bottom:1px solid #E4E2DA}td{padding:8px;border-bottom:1px solid #E4E2DA;font-family:monospace}td:first-child{font-family:inherit;color:#6B6A65}.pbtn{position:fixed;bottom:24px;right:24px;background:#1A1A18;color:#fff;border:none;border-radius:99px;padding:12px 24px;font-size:14px;cursor:pointer}@media print{.pbtn{display:none}}</style></head><body><div class="page"><h1>💰 Finance Report</h1><div class="sub">'+mStr+'</div><div class="mgrid">'+mets+'</div><div class="sec"><div class="stitle">6-Month Overview</div><div class="card"><div class="ch"><canvas id="hc"></canvas></div></div></div><div class="two"><div class="card"><div class="stitle">By Category</div><div class="ch"><canvas id="cc"></canvas></div></div></div><div class="sec"><div class="stitle">Monthly Summary</div><div class="card"><table><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div></div><button class="pbtn" onclick="window.print()">🖨 Print PDF</button><scr'+'ipt>'+sD+sC+'</scr'+'ipt></body></html>';
+  /* Daily limit section for report */
+  var dlimit=D.config.dailyLimit||0;
+  var dlRows='';
+  var dlSummary='';
+  if(dlimit>0){
+    var rDim=new Date(curDate.getFullYear(),curDate.getMonth()+1,0).getDate();
+    var rNow2=new Date();
+    var rIsCur=rNow2.getFullYear()===curDate.getFullYear()&&rNow2.getMonth()===curDate.getMonth();
+    var rLastDay=rIsCur?rNow2.getDate():rDim;
+    var rDayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var rOver=0,rOK=0,rNoSpend=0,rWorstAmt=0,rWorstDate='';
+    for(var ri=1;ri<=rLastDay;ri++){
+      var rDd=new Date(curDate.getFullYear(),curDate.getMonth(),ri);
+      var rSpent=getExpenses().filter(function(e){return new Date(e.date).getDate()===ri;}).reduce(function(s,e){return s+e.amt;},0);
+      var rStatus=rSpent===0?'No spend':(rSpent<=dlimit?'OK':'Over');
+      var rColor=rSpent===0?'#9E9C97':rSpent<=dlimit?'#1D9E75':'#D85A30';
+      if(rStatus==='Over')rOver++;
+      else if(rStatus==='OK')rOK++;
+      else rNoSpend++;
+      if(rSpent>rWorstAmt){rWorstAmt=rSpent;rWorstDate=rDd.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});}
+      dlRows+='<tr><td>'+rDd.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+'</td><td>'+rDayNames[rDd.getDay()]+'</td><td>₹'+Math.round(rSpent).toLocaleString('en-IN')+'</td><td style="color:'+rColor+';font-weight:600">'+rStatus+'</td><td style="color:'+(rSpent>dlimit?'#D85A30':'#1D9E75')+'">'+(rSpent>0?'₹'+Math.round(dlimit-rSpent).toLocaleString('en-IN'):'-')+'</td></tr>';
+    }
+    var rPct=rLastDay>0?Math.round((rOK+rNoSpend)/rLastDay*100):0;
+    dlSummary='<div class="sec"><div class="stitle">Daily Limit Analysis — ₹'+dlimit.toLocaleString('en-IN')+'/day</div><div class="card"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px"><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Within Limit</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#1D9E75">'+rOK+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Over Limit</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#D85A30">'+rOver+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">No Spend</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#185FA5">'+rNoSpend+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Success Rate</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:'+(rPct>=80?'#1D9E75':rPct>=60?'#BA7517':'#D85A30')+'">'+rPct+'%</div></div>'+(rWorstDate?'<div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Worst Day</div><div style="font-family:monospace;font-size:14px;font-weight:600;color:#D85A30">'+rWorstDate+'</div><div style="font-size:11px;color:#9E9C97">₹'+Math.round(rWorstAmt).toLocaleString('en-IN')+'</div></div>':'')+'</div><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Day</th><th>Spent</th><th>Status</th><th>Over/Under</th></tr></thead><tbody>'+dlRows+'</tbody></table></div></div></div>';
+  }
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report '+mStr+'</title><scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></scr'+'ipt><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#F7F6F3;color:#1A1A18;font-size:15px}.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem}h1{font-size:24px;font-weight:700;margin-bottom:4px}.sub{color:#6B6A65;font-size:14px;margin-bottom:2rem}.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:2rem}.sec{margin-bottom:2rem}.stitle{font-size:11px;font-weight:600;text-transform:uppercase;color:#9E9C97;margin-bottom:10px}.card{background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:1.25rem 1.5rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}.ch{position:relative;height:200px}table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:10px;font-weight:600;text-transform:uppercase;color:#9E9C97;text-align:left;padding:6px 8px;border-bottom:1px solid #E4E2DA}td{padding:8px;border-bottom:1px solid #E4E2DA;font-family:monospace}td:first-child{font-family:inherit;color:#6B6A65}.pbtn{position:fixed;bottom:24px;right:24px;background:#1A1A18;color:#fff;border:none;border-radius:99px;padding:12px 24px;font-size:14px;cursor:pointer}@media print{.pbtn{display:none}}</style></head><body><div class="page"><h1>💰 Finance Report</h1><div class="sub">'+mStr+'</div><div class="mgrid">'+mets+'</div><div class="sec"><div class="stitle">6-Month Overview</div><div class="card"><div class="ch"><canvas id="hc"></canvas></div></div></div><div class="two"><div class="card"><div class="stitle">By Category</div><div class="ch"><canvas id="cc"></canvas></div></div></div><div class="sec"><div class="stitle">Monthly Summary</div><div class="card"><table><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div>'+dlSummary+'</div><button class="pbtn" onclick="window.print()">🖨 Print PDF</button><scr'+'ipt>'+sD+sC+'</scr'+'ipt></body></html>';
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download='finance-report-'+mk()+'.html';a.click();
 }
 
