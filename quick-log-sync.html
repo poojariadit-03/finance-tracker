@@ -385,6 +385,7 @@ input[type=date]:focus{border-color:var(--green)}
     <select id="an-month"></select>
     <select id="an-cat"><option value="">All categories</option><option>Food</option><option>Transport</option><option>Shopping</option><option>Health</option><option>Entertainment</option><option>Utilities</option><option>Education</option><option>Other</option></select>
     <select id="an-acc"><option value="">All accounts</option></select>
+    <input type="text" id="an-search" placeholder="Search expenses..." style="background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none;width:100%">
     <button class="add-btn" style="margin-bottom:0;padding:12px;font-size:15px" onclick="renderQLAnalyse()">Apply filters</button>
   </div>
   <div class="an-pills">
@@ -1107,11 +1108,18 @@ function renderQLAnalyse(){
   var selMonth=document.getElementById('an-month').value||(new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
   var selCat=document.getElementById('an-cat').value;
   var selAccVal=document.getElementById('an-acc').value;
+  var selSearch=(document.getElementById('an-search').value||'').toLowerCase().trim();
   var p=selMonth.split('-'),anDate=new Date(parseInt(p[0]),parseInt(p[1])-1,1);
   var prevDate=new Date(anDate.getFullYear(),anDate.getMonth()-1,1);
   var prevM=prevDate.getFullYear()+'-'+String(prevDate.getMonth()+1).padStart(2,'0');
   var CC2={Food:'#1D9E75',Transport:'#378ADD',Shopping:'#D4537E',Health:'#7F77DD',Entertainment:'#EF9F27',Utilities:'#3B6D11',Education:'#534AB7',Other:'#888780'};
-  var exps=D.expenses.filter(function(e){return e.month===selMonth&&(!selCat||e.cat===selCat)&&(!selAccVal||e.accountId===selAccVal);});
+  var exps=D.expenses.filter(function(e){
+    if(e.month!==selMonth)return false;
+    if(selCat&&e.cat!==selCat)return false;
+    if(selAccVal&&e.accountId!==selAccVal)return false;
+    if(selSearch&&e.name.toLowerCase().indexOf(selSearch)<0&&e.cat.toLowerCase().indexOf(selSearch)<0&&(!e.note||e.note.toLowerCase().indexOf(selSearch)<0))return false;
+    return true;
+  });
   var prevExps=D.expenses.filter(function(e){return e.month===prevM&&(!selCat||e.cat===selCat)&&(!selAccVal||e.accountId===selAccVal);});
   var total=exps.reduce(function(s,e){return s+e.amt;},0);
   var prevTotal=prevExps.reduce(function(s,e){return s+e.amt;},0);
@@ -1121,12 +1129,23 @@ function renderQLAnalyse(){
   var avg=daysEl>0?total/daysEl:0;
   var cats={};exps.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
   var topCat=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];})[0]||'—';
+  /* No-spend day streak */
+  var noSpendStreak=0,today2=new Date();
+  for(var ns=1;ns<=60;ns++){
+    var nd=new Date(today2.getFullYear(),today2.getMonth(),today2.getDate()-ns);
+    var ndKey=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0')+'-'+String(nd.getDate()).padStart(2,'0');
+    var ndM=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');
+    var hasExp=D.expenses.some(function(e){return e.month===ndM&&e.date&&e.date.slice(0,10)===ndKey;});
+    if(!hasExp)noSpendStreak++;else break;
+  }
+  var streakHtml=noSpendStreak>=2?'<div class="an-mcard"><span class="an-mlabel">No-spend streak</span><span class="an-mval" style="color:var(--green);font-size:15px">🎯 '+noSpendStreak+' days</span></div>':'';
   /* Summary metrics */
   document.getElementById('an-metrics').innerHTML=
     '<div class="an-mcard"><span class="an-mlabel">Total spent</span><span class="an-mval" style="color:var(--red)">'+fmt(total)+'</span></div>'+
     '<div class="an-mcard"><span class="an-mlabel">Avg / day</span><span class="an-mval">'+fmt(Math.round(avg))+'</span></div>'+
     '<div class="an-mcard"><span class="an-mlabel">Transactions</span><span class="an-mval" style="color:var(--blue)">'+exps.length+'</span></div>'+
-    '<div class="an-mcard"><span class="an-mlabel">Top category</span><span class="an-mval" style="font-size:15px;color:var(--green)">'+topCat+'</span></div>';
+    '<div class="an-mcard"><span class="an-mlabel">Top category</span><span class="an-mval" style="font-size:15px;color:var(--green)">'+topCat+'</span></div>'+
+    streakHtml;
   /* Categories */
   var sortedCats=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];});
   document.getElementById('an-cats').innerHTML='<div style="margin-bottom:14px">'+sortedCats.map(function(k){
