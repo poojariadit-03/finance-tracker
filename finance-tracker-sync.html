@@ -1921,7 +1921,7 @@ function updateCharts(){
 
 /* ═══ GOALS ═══ */
 function addGoal(){var emoji=document.getElementById('gEmoji').value.trim()||'🎯',name=document.getElementById('gName').value.trim(),target=parseFloat(document.getElementById('gTarget').value),deadline=document.getElementById('gDeadline').value||'';if(!name||isNaN(target)||target<=0)return;D.goals.push({id:Date.now().toString(),emoji:emoji,name:name,target:target,deadline:deadline,contributions:[],autoAmt:0,autoDay:0});autoSave();['gEmoji','gName','gTarget','gDeadline'].forEach(function(id){document.getElementById(id).value='';});renderGoals();}
-function removeGoal(id){D.goals=D.goals.filter(function(g){return g.id!==id;});autoSave();renderGoals();}
+function removeGoal(id){if(!confirm('Delete this goal?'))return;D.goals=D.goals.filter(function(g){return g.id!==id;});autoSave();renderGoals();}
 
 function addWithdrawal(id){
   var inp=document.getElementById('withdraw-'+id);
@@ -1975,7 +1975,7 @@ function addLiability(){
   autoSave();document.getElementById('liabName').value='';document.getElementById('liabAmt').value='';
   renderNetWorth();
 }
-function removeLiability(id){D.liabilities=(D.liabilities||[]).filter(function(l){return l.id!==id;});autoSave();renderNetWorth();}
+function removeLiability(id){if(!confirm('Delete this liability?'))return;D.liabilities=(D.liabilities||[]).filter(function(l){return l.id!==id;});autoSave();renderNetWorth();}
 function renderNWSnapshot(){
   var el=document.getElementById('nwSnapshotBody');if(!el)return;
   var accs=D.accounts;
@@ -2056,9 +2056,9 @@ function matDate(s,m){var d=new Date(s);d.setMonth(d.getMonth()+m);return d;}
 function calcFD(p,r,m){return p*Math.pow(1+r/400,m/3);}
 function calcRD(mo,r,m){var qi=r/400,t=0;for(var i=1;i<=m;i++)t+=mo*Math.pow(1+qi,(m-i+1)/3);return t;}
 function addFD(){var bank=document.getElementById('fd-bank').value.trim(),amt=parseFloat(document.getElementById('fd-amt').value),rate=parseFloat(document.getElementById('fd-rate').value),tenure=parseInt(document.getElementById('fd-tenure').value),start=document.getElementById('fd-start').value;if(!bank||isNaN(amt)||isNaN(rate)||isNaN(tenure)||!start)return;D.fds.push({id:Date.now().toString(),bank:bank,amt:amt,rate:rate,tenure:tenure,start:start});autoSave();['fd-bank','fd-amt','fd-rate','fd-tenure','fd-start'].forEach(function(id){document.getElementById(id).value='';});renderInvestments();}
-function removeFD(id){D.fds=D.fds.filter(function(f){return f.id!==id;});autoSave();renderInvestments();}
+function removeFD(id){if(!confirm('Delete this FD?'))return;D.fds=D.fds.filter(function(f){return f.id!==id;});autoSave();renderInvestments();}
 function addRD(){var bank=document.getElementById('rd-bank').value.trim(),amt=parseFloat(document.getElementById('rd-amt').value),rate=parseFloat(document.getElementById('rd-rate').value),tenure=parseInt(document.getElementById('rd-tenure').value),start=document.getElementById('rd-start').value;if(!bank||isNaN(amt)||isNaN(rate)||isNaN(tenure)||!start)return;D.rds.push({id:Date.now().toString(),bank:bank,amt:amt,rate:rate,tenure:tenure,start:start});autoSave();['rd-bank','rd-amt','rd-rate','rd-tenure','rd-start'].forEach(function(id){document.getElementById(id).value='';});renderInvestments();}
-function removeRD(id){D.rds=D.rds.filter(function(r){return r.id!==id;});autoSave();renderInvestments();}
+function removeRD(id){if(!confirm('Delete this RD?'))return;D.rds=D.rds.filter(function(r){return r.id!==id;});autoSave();renderInvestments();}
 
 function renderInvestments(){
   var totInv=0,totCur=0,totMat=0;  /* BUG FIX: totCur declared */
@@ -2390,7 +2390,7 @@ function addExtraIncome(){
   D.extraIncome.push({id:Date.now().toString(),date:ed,month:m,name:name,source:selIncSrc,amt:amt,accountId:_incAccId});
   autoSave();document.getElementById('incName').value='';document.getElementById('incAmt').value='';renderExtraIncome();recalc();
 }
-function removeExtraIncome(id){D.extraIncome=D.extraIncome.filter(function(e){return e.id!==id;});autoSave();renderExtraIncome();recalc();}
+function removeExtraIncome(id){if(!confirm('Delete this extra income entry?'))return;D.extraIncome=D.extraIncome.filter(function(e){return e.id!==id;});autoSave();renderExtraIncome();recalc();}
 function toggleExtraIncForm(){
   var f=document.getElementById('inc-log-form');
   var btn=document.getElementById('extraIncToggleBtn');
@@ -2674,6 +2674,7 @@ function markReturned(id){
   showToast(fmt(entry.amt)+' returned by '+entry.name+'!','success');
 }
 function deleteLent(id){
+  if(!confirm('Delete this lent entry?'))return;
   D.lent=(D.lent||[]).filter(function(l){return l.id!==id;});
   autoSave();renderLent();updateLentBadge();
 }
