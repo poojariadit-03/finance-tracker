@@ -2502,15 +2502,62 @@ function exportReport(months){
   months=months||6;
   var income=(D.config.income||0)+extraIncomeTotal(),fxd=fixedMonthly(),exps=getExpenses();
   var spent=exps.reduce(function(s,e){return s+e.amt;},0),savA=Math.max(0,income-fxd-spent),bal=income-fxd-spent;
+  var savRate=income>0?Math.round(savA/income*100):0;
+
+  /* Previous month for comparison */
+  var prevDate=new Date(curDate.getFullYear(),curDate.getMonth()-1,1);
+  var prevExps=getExpenses(prevDate),prevSpent=prevExps.reduce(function(s,e){return s+e.amt;},0);
+  var prevIncome=(D.config.income||0)+extraIncomeTotal(prevDate);
+  var prevSavA=Math.max(0,prevIncome-fxd-prevSpent);
+  var prevSavRate=prevIncome>0?Math.round(prevSavA/prevIncome*100):0;
+  var spentDiff=prevSpent>0?Math.round((spent-prevSpent)/prevSpent*100):null;
+  var savDiff=prevSavA>0?Math.round((savA-prevSavA)/prevSavA*100):null;
+
   var monthsArr=[];for(var i=months-1;i>=0;i--)monthsArr.push(new Date(curDate.getFullYear(),curDate.getMonth()-i,1));
-  var hist=monthsArr.map(function(d){var s=getExpenses(d).reduce(function(a,e){return a+e.amt;},0),mI=(D.config.income||0)+extraIncomeTotal(d);return{label:d.toLocaleString('default',{month:'short',year:'numeric'}),income:mI,fxd:Math.round(fxd),spent:Math.round(s),savings:Math.round(Math.max(0,mI-fxd-s)),balance:Math.round(mI-fxd-s)};});
+  var hist=monthsArr.map(function(d){var s=getExpenses(d).reduce(function(a,e){return a+e.amt;},0),mI=(D.config.income||0)+extraIncomeTotal(d);var sv=Math.max(0,mI-fxd-s);return{label:d.toLocaleString('default',{month:'short',year:'numeric'}),income:mI,fxd:Math.round(fxd),spent:Math.round(s),savings:Math.round(sv),savRate:mI>0?Math.round(sv/mI*100):0,balance:Math.round(mI-fxd-s)};});
+
   var cats={};exps.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
-  var cL=Object.keys(cats),cD=cL.map(function(k){return Math.round(cats[k]);}),cC=cL.map(function(k){return getCatColor(k);});
-  var mStr=curDate.toLocaleString('default',{month:'long',year:'numeric'}),r=function(n){return '₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');};
-  var mets=[['Income',r(income),'#185FA5'],['Fixed',r(fxd),'#D85A30'],['Spent',r(spent),'#D85A30'],['Saved',r(savA),'#1D9E75'],['Balance',r(bal),bal>=0?'#1D9E75':'#D85A30']].map(function(m){return '<div style="background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:.9rem 1rem"><div style="font-size:10px;color:#9E9C97;margin-bottom:5px">'+m[0]+'</div><div style="font-family:monospace;font-size:20px;font-weight:600;color:'+m[2]+'">'+m[1]+'</div></div>';}).join('');
-  var hRows='';hist.forEach(function(h){hRows+='<tr><td>'+h.label+'</td><td>'+r(h.income)+'</td><td>'+r(h.fxd)+'</td><td>'+r(h.spent)+'</td><td style="color:#1D9E75">'+r(h.savings)+'</td><td style="color:'+(h.balance>=0?'#1D9E75':'#D85A30')+'">'+r(h.balance)+'</td></tr>';});
-  var sD='var H='+JSON.stringify(hist)+';var CL='+JSON.stringify(cL)+';var CD='+JSON.stringify(cD)+';var CC2='+JSON.stringify(cC)+';';
-  var sC='try{new Chart(document.getElementById("hc"),{type:"bar",data:{labels:H.map(function(d){return d.label;}),datasets:[{data:H.map(function(d){return d.income;}),backgroundColor:"#378ADD",borderRadius:4},{data:H.map(function(d){return d.fxd+d.spent;}),backgroundColor:"#D85A30",borderRadius:4},{data:H.map(function(d){return d.savings;}),backgroundColor:"#1D9E75",borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{ticks:{callback:function(v){return"₹"+(v>=100000?(v/100000).toFixed(0)+"L":v>=1000?(v/1000).toFixed(0)+"K":v);}}}}}});if(CL.length)new Chart(document.getElementById("cc"),{type:"doughnut",data:{labels:CL,datasets:[{data:CD,backgroundColor:CC2,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:"62%",plugins:{legend:{display:false}}}});}catch(e){}';
+  var cL=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];});
+  var cD=cL.map(function(k){return Math.round(cats[k]);}),cC=cL.map(function(k){return getCatColor(k);});
+
+  /* Top categories ranked */
+  var topCats=cL.slice(0,5).map(function(k){return {name:k,amt:Math.round(cats[k]),color:getCatColor(k),pct:spent>0?Math.round(cats[k]/spent*100):0};});
+
+  var mStr=curDate.toLocaleString('default',{month:'long',year:'numeric'});
+  var generatedOn=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  var r=function(n){return '\u20b9'+Math.abs(Math.round(n)).toLocaleString('en-IN');};
+  var pct=function(v,good){var arrow=v>0?'\u25b2':'\u25bc';var col=((v>0)===good)?'#1D9E75':'#D85A30';return '<span style="color:'+col+';font-size:11px;font-weight:600">'+arrow+' '+Math.abs(v)+'%</span>';};
+
+  /* Metric cards — now includes Savings Rate + MoM change */
+  var metCards=[
+    {label:'Income',val:r(income),color:'#185FA5',sub:null},
+    {label:'Fixed',val:r(fxd),color:'#D85A30',sub:null},
+    {label:'Spent',val:r(spent),color:'#D85A30',sub:spentDiff!==null?pct(spentDiff,false)+' vs last month':null},
+    {label:'Saved',val:r(savA),color:'#1D9E75',sub:savDiff!==null?pct(savDiff,true)+' vs last month':null},
+    {label:'Savings Rate',val:savRate+'%',color:savRate>=20?'#1D9E75':savRate>=10?'#BA7517':'#D85A30',sub:prevSavRate>0?'Last month: '+prevSavRate+'%':null},
+    {label:'Balance',val:r(bal),color:bal>=0?'#1D9E75':'#D85A30',sub:null}
+  ];
+  var mets=metCards.map(function(m){return '<div style="background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:.9rem 1rem"><div style="font-size:10px;color:#9E9C97;margin-bottom:5px">'+m.label+'</div><div style="font-family:monospace;font-size:20px;font-weight:600;color:'+m.color+'">'+m.val+'</div>'+(m.sub?'<div style="margin-top:4px;font-size:11px;color:#9E9C97">'+m.sub+'</div>':'')+'</div>';}).join('');
+
+  /* History table rows — includes Savings Rate column */
+  var hRows='';hist.forEach(function(h){hRows+='<tr><td>'+h.label+'</td><td>'+r(h.income)+'</td><td>'+r(h.fxd)+'</td><td>'+r(h.spent)+'</td><td style="color:#1D9E75">'+r(h.savings)+'</td><td style="color:'+(h.savRate>=20?'#1D9E75':h.savRate>=10?'#BA7517':'#D85A30')+'">'+h.savRate+'%</td><td style="color:'+(h.balance>=0?'#1D9E75':'#D85A30')+'">'+r(h.balance)+'</td></tr>';});
+
+  /* Top categories HTML */
+  var topCatHtml=topCats.length?topCats.map(function(c){var barW=c.pct;return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:13px;font-weight:500;color:#1A1A18">'+c.name+'</span><span style="font-family:monospace;font-size:13px;color:'+c.color+';font-weight:600">'+r(c.amt)+' <span style="color:#9E9C97;font-weight:400">('+c.pct+'%)</span></span></div><div style="background:#F1F0EC;border-radius:99px;height:6px"><div style="background:'+c.color+';width:'+barW+'%;height:6px;border-radius:99px"></div></div></div>';}).join(''):'<p style="color:#9E9C97;font-size:13px">No expenses this month.</p>';
+
+  /* Chart scripts */
+  var sD='var H='+JSON.stringify(hist)+';var CL='+JSON.stringify(cL)+';var CD='+JSON.stringify(cD)+';var CC2='+JSON.stringify(cC)+';var MONTHS='+months+';';
+
+  /* Bar chart — if 1 month, show summary cards instead; else show multi-month bar with legend */
+  var overviewSection='';
+  if(months===1){
+    /* Single month: show a cleaner summary card layout instead of lonely single bar */
+    overviewSection='<div class="sec"><div class="stitle">This Month Overview</div><div class="card"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"><div style="text-align:center;padding:12px;background:#F1F0EC;border-radius:10px"><div style="font-size:11px;color:#9E9C97;margin-bottom:4px;text-transform:uppercase">Income</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#185FA5">'+r(income)+'</div></div><div style="text-align:center;padding:12px;background:#F1F0EC;border-radius:10px"><div style="font-size:11px;color:#9E9C97;margin-bottom:4px;text-transform:uppercase">Total Out</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#D85A30">'+r(fxd+spent)+'</div></div><div style="text-align:center;padding:12px;background:#F1F0EC;border-radius:10px"><div style="font-size:11px;color:#9E9C97;margin-bottom:4px;text-transform:uppercase">Saved</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#1D9E75">'+r(savA)+' <span style="font-size:13px">('+savRate+'%)</span></div></div></div>'+(spentDiff!==null?'<div style="margin-top:14px;padding:10px 14px;background:'+(spentDiff<=0?'#E8F7F2':'#FEF0EC')+';border-radius:8px;font-size:13px;color:#1A1A18">'+( spentDiff<=0?'\uD83D\uDCC9 Spent '+Math.abs(spentDiff)+'% less than last month — great job!':'\uD83D\uDCC8 Spent '+Math.abs(spentDiff)+'% more than last month.')+'</div>':'')+' </div></div>';
+  } else {
+    var legendHtml='<div style="display:flex;gap:16px;margin-bottom:10px;font-size:12px"><span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;display:inline-block"></span>Income</span><span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#D85A30;display:inline-block"></span>Fixed+Spent</span><span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block"></span>Savings</span></div>';
+    overviewSection='<div class="sec"><div class="stitle">'+months+'-Month Overview</div><div class="card">'+legendHtml+'<div class="ch"><canvas id="hc"></canvas></div></div></div>';
+  }
+
   /* Daily limit section for report */
   var dlimit=D.config.dailyLimit||0;
   var dlRows='';
@@ -2531,10 +2578,10 @@ function exportReport(months){
       else if(rStatus==='OK')rOK++;
       else rNoSpend++;
       if(rSpent>rWorstAmt){rWorstAmt=rSpent;rWorstDate=rDd.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});}
-      dlRows+='<tr><td>'+rDd.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+'</td><td>'+rDayNames[rDd.getDay()]+'</td><td>₹'+Math.round(rSpent).toLocaleString('en-IN')+'</td><td style="color:'+rColor+';font-weight:600">'+rStatus+'</td><td style="color:'+(rSpent>dlimit?'#D85A30':'#1D9E75')+'">'+(rSpent>0?'₹'+Math.round(dlimit-rSpent).toLocaleString('en-IN'):'-')+'</td></tr>';
+      dlRows+='<tr><td>'+rDd.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+'</td><td>'+rDayNames[rDd.getDay()]+'</td><td>\u20b9'+Math.round(rSpent).toLocaleString('en-IN')+'</td><td style="color:'+rColor+';font-weight:600">'+rStatus+'</td><td style="color:'+(rSpent>dlimit?'#D85A30':'#1D9E75')+'">'+(rSpent>0?'\u20b9'+Math.round(dlimit-rSpent).toLocaleString('en-IN'):'-')+'</td></tr>';
     }
     var rPct=rLastDay>0?Math.round((rOK+rNoSpend)/rLastDay*100):0;
-    dlSummary='<div class="sec"><div class="stitle">Daily Limit Analysis — ₹'+dlimit.toLocaleString('en-IN')+'/day</div><div class="card"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px"><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Within Limit</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#1D9E75">'+rOK+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Over Limit</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#D85A30">'+rOver+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">No Spend</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#185FA5">'+rNoSpend+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Success Rate</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:'+(rPct>=80?'#1D9E75':rPct>=60?'#BA7517':'#D85A30')+'">'+rPct+'%</div></div>'+(rWorstDate?'<div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Worst Day</div><div style="font-family:monospace;font-size:14px;font-weight:600;color:#D85A30">'+rWorstDate+'</div><div style="font-size:11px;color:#9E9C97">₹'+Math.round(rWorstAmt).toLocaleString('en-IN')+'</div></div>':'')+'</div><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Day</th><th>Spent</th><th>Status</th><th>Over/Under</th></tr></thead><tbody>'+dlRows+'</tbody></table></div></div></div>';
+    dlSummary='<div class="sec"><div class="stitle">Daily Limit Analysis \u2014 \u20b9'+dlimit.toLocaleString('en-IN')+'/day</div><div class="card"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px"><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Within Limit</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#1D9E75">'+rOK+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Over Limit</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#D85A30">'+rOver+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">No Spend</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:#185FA5">'+rNoSpend+' days</div></div><div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Success Rate</div><div style="font-family:monospace;font-size:18px;font-weight:600;color:'+(rPct>=80?'#1D9E75':rPct>=60?'#BA7517':'#D85A30')+'">'+rPct+'%</div></div>'+(rWorstDate?'<div style="background:#F1F0EC;border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9E9C97;text-transform:uppercase;margin-bottom:4px">Worst Day</div><div style="font-family:monospace;font-size:14px;font-weight:600;color:#D85A30">'+rWorstDate+'</div><div style="font-size:11px;color:#9E9C97">\u20b9'+Math.round(rWorstAmt).toLocaleString('en-IN')+'</div></div>':'')+'</div><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Day</th><th>Spent</th><th>Status</th><th>Over/Under</th></tr></thead><tbody>'+dlRows+'</tbody></table></div></div></div>';
   }
   /* Day-by-day section for report */
   var dbdSection='';
@@ -2553,16 +2600,36 @@ function exportReport(months){
       var rDd2=new Date(curDate.getFullYear(),curDate.getMonth(),rdi);
       var rItems=rGrp[rdi]||[];
       var rDayAmt=rItems.reduce(function(s,e){return s+e.amt;},0);
-      if(rDayAmt===0)continue; /* skip no-spend days */
+      if(rDayAmt===0)continue;
       var rDayLabel=rDd2.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
       var rItemRows=rItems.sort(function(a,b){return new Date(a.date)-new Date(b.date);}).map(function(e){
-        return '<tr><td style="padding-left:20px;color:#1A1A18">'+e.name+'</td><td><span style="background:'+(rCC2[e.cat]||'#888')+'22;color:'+(rCC2[e.cat]||'#888')+';padding:2px 8px;border-radius:99px;font-size:11px;font-family:sans-serif">'+e.cat+'</span></td><td style="color:#1A1A18;font-weight:600">₹'+Math.round(e.amt).toLocaleString('en-IN')+'</td></tr>';
+        return '<tr><td style="padding-left:20px;color:#1A1A18">'+e.name+'</td><td><span style="background:'+(rCC2[e.cat]||'#888')+'22;color:'+(rCC2[e.cat]||'#888')+';padding:2px 8px;border-radius:99px;font-size:11px;font-family:sans-serif">'+e.cat+'</span></td><td style="color:#1A1A18;font-weight:600">\u20b9'+Math.round(e.amt).toLocaleString('en-IN')+'</td></tr>';
       }).join('');
-      rDayRows+='<tr style="background:#F7F6F3"><td colspan="3" style="padding:8px 10px;font-family:sans-serif;font-weight:600;font-size:13px;color:#1A1A18;border-bottom:2px solid #E4E2DA">'+rDayLabel+'<span style="float:right;font-family:monospace;color:#D85A30">₹'+Math.round(rDayAmt).toLocaleString('en-IN')+'</span></td></tr>'+rItemRows;
+      rDayRows+='<tr style="background:#F7F6F3"><td colspan="3" style="padding:8px 10px;font-family:sans-serif;font-weight:600;font-size:13px;color:#1A1A18;border-bottom:2px solid #E4E2DA">'+rDayLabel+'<span style="float:right;font-family:monospace;color:#D85A30">\u20b9'+Math.round(rDayAmt).toLocaleString('en-IN')+'</span></td></tr>'+rItemRows;
     }
     dbdSection='<div class="sec"><div class="stitle">Day-by-Day Breakdown</div><div class="card" style="padding:0;overflow:hidden"><table style="margin:0"><thead><tr><th>Expense</th><th>Category</th><th>Amount</th></tr></thead><tbody>'+rDayRows+'</tbody></table></div></div>';
   }
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report '+mStr+'</title><scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></scr'+'ipt><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#F7F6F3;color:#1A1A18;font-size:15px}.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem}h1{font-size:24px;font-weight:700;margin-bottom:4px}.sub{color:#6B6A65;font-size:14px;margin-bottom:2rem}.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:2rem}.sec{margin-bottom:2rem}.stitle{font-size:11px;font-weight:600;text-transform:uppercase;color:#9E9C97;margin-bottom:10px}.card{background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:1.25rem 1.5rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}.ch{position:relative;height:200px}table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:10px;font-weight:600;text-transform:uppercase;color:#9E9C97;text-align:left;padding:6px 8px;border-bottom:1px solid #E4E2DA}td{padding:8px;border-bottom:1px solid #E4E2DA;font-family:monospace}td:first-child{font-family:inherit;color:#6B6A65}.pbtn{position:fixed;bottom:24px;right:24px;background:#1A1A18;color:#fff;border:none;border-radius:99px;padding:12px 24px;font-size:14px;cursor:pointer}@media print{.pbtn{display:none}}</style></head><body><div class="page"><h1>💰 Finance Report</h1><div class="sub">'+mStr+'</div><div class="mgrid">'+mets+'</div><div class="sec"><div class="stitle">'+(months===1?'This Month Overview':months+'-Month Overview')+'</div><div class="card"><div class="ch"><canvas id="hc"></canvas></div></div></div><div class="two"><div class="card"><div class="stitle">By Category</div><div class="ch"><canvas id="cc"></canvas></div></div></div><div class="sec"><div class="stitle">Monthly Summary</div><div class="card"><table><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div>'+dbdSection+dlSummary+'</div><button class="pbtn" onclick="window.print()">🖨 Print PDF</button><scr'+'ipt>'+sD+sC+'</scr'+'ipt></body></html>';
+
+  /* Chart script — bar chart with legend + doughnut with labels */
+  var sC='try{'
+    +'if(MONTHS>1){new Chart(document.getElementById("hc"),{type:"bar",data:{labels:H.map(function(d){return d.label;}),datasets:[{label:"Income",data:H.map(function(d){return d.income;}),backgroundColor:"#378ADD",borderRadius:4},{label:"Fixed+Spent",data:H.map(function(d){return d.fxd+d.spent;}),backgroundColor:"#D85A30",borderRadius:4},{label:"Savings",data:H.map(function(d){return d.savings;}),backgroundColor:"#1D9E75",borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{ticks:{callback:function(v){return"\u20b9"+(v>=100000?(v/100000).toFixed(0)+"L":v>=1000?(v/1000).toFixed(0)+"K":v);}}}}}});}'
+    +'if(CL.length){new Chart(document.getElementById("cc"),{type:"doughnut",data:{labels:CL,datasets:[{data:CD,backgroundColor:CC2,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:"55%",plugins:{legend:{display:true,position:"right",labels:{font:{size:11},boxWidth:12,padding:8}}}}});}'
+    +'}catch(e){}';
+
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report '+mStr+'</title>'
+    +'<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"><\/script>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#F7F6F3;color:#1A1A18;font-size:15px}.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem}.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2rem}h1{font-size:24px;font-weight:700;margin-bottom:4px}.sub{color:#6B6A65;font-size:14px}.gen{font-size:11px;color:#9E9C97;margin-top:4px}.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:2rem}.sec{margin-bottom:2rem}.stitle{font-size:11px;font-weight:600;text-transform:uppercase;color:#9E9C97;margin-bottom:10px}.card{background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:1.25rem 1.5rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}.ch{position:relative;height:220px}table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:10px;font-weight:600;text-transform:uppercase;color:#9E9C97;text-align:left;padding:6px 8px;border-bottom:1px solid #E4E2DA}td{padding:8px;border-bottom:1px solid #E4E2DA;font-family:monospace}td:first-child{font-family:inherit;color:#6B6A65}.pbtn{position:fixed;bottom:24px;right:24px;background:#1A1A18;color:#fff;border:none;border-radius:99px;padding:12px 24px;font-size:14px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2)}@media print{.pbtn{display:none}}</style>'
+    +'</head><body><div class="page">'
+    +'<div class="hdr"><div><h1>\uD83D\uDCB0 Finance Report</h1><div class="sub">'+mStr+'</div><div class="gen">Generated on '+generatedOn+'</div></div></div>'
+    +'<div class="mgrid">'+mets+'</div>'
+    +overviewSection
+    +'<div class="two"><div class="card"><div class="stitle">By Category</div><div class="ch"><canvas id="cc"></canvas></div></div>'
+    +'<div class="card"><div class="stitle">Top Spending Categories</div>'+topCatHtml+'</div></div>'
+    +'<div class="sec"><div class="stitle">Monthly Summary</div><div class="card"><div style="overflow-x:auto"><table><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Sav %</th><th>Balance</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div></div>'
+    +dbdSection+dlSummary
+    +'</div><button class="pbtn" onclick="window.print()">\uD83D\uDDB8 Print / Save PDF</button>'
+    +'<script>'+sD+sC+'<\/script></body></html>';
+
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download='finance-report-'+mk()+'.html';a.click();
 }
 
