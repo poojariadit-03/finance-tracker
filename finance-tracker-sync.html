@@ -377,8 +377,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <button class="tab" data-tab="calendar" onclick="switchTab('calendar')">📅 Calendar</button>
   <button class="tab" data-tab="expenses" onclick="switchTab('expenses')">Expenses <span class="badge" id="budgetBadge" style="display:none">!</span><span id="expCountBadge" style="font-size:10px;color:var(--tx3);margin-left:2px"></span></button>
   <button class="tab" data-tab="fixed" onclick="switchTab('fixed')">🔁 Fixed <span class="badge" id="pendingBadge" style="display:none">0</span></button>
-  <button class="tab" data-tab="history" onclick="switchTab('history')">📊 History</button>
-  <button class="tab" data-tab="charts" onclick="switchTab('charts')">Charts</button>
+  <button class="tab" data-tab="history" onclick="switchTab('history')">📊 History & Charts</button>
   <button class="tab" data-tab="goals" onclick="switchTab('goals')">🎯 Goals</button>
   <button class="tab" data-tab="invest" onclick="switchTab('invest')">📈 Invest</button>
   <button class="tab" data-tab="networth" onclick="switchTab('networth')">💎 Net Worth</button>
@@ -618,10 +617,9 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   </div>
   <div class="card"><div class="card-hd"><span class="ctitle">6-month comparison</span></div><div style="position:relative;height:220px"><canvas id="histChart"></canvas></div><div class="legwrap" id="histLeg"></div></div>
   <div class="card"><div class="card-hd"><span class="ctitle">Monthly summary</span></div><div style="overflow-x:auto"><table class="htable"><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody id="histBody"></tbody></table></div></div>
-</div>
-<div class="tab-content" id="tab-charts">
+  <hr style="border:none;border-top:1px solid var(--bdr);margin:1rem 0">
   <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <span style="font-size:12px;color:var(--tx3)">Showing:</span>
+    <span style="font-size:12px;font-weight:600;color:var(--tx2)">📊 Charts —</span>
     <button class="hist-pill active" id="chartPillCur" onclick="setChartMonth(0,this)">This month</button>
     <button class="hist-pill" onclick="setChartMonth(-1,this)">Last month</button>
     <button class="hist-pill" onclick="setChartMonth(-2,this)">2 months ago</button>
@@ -993,7 +991,7 @@ function jumpToToday(){curDate=new Date();selDay=null;updateHeader();renderAll()
 function switchTab(n){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===n);});
   document.querySelectorAll('.tab-content').forEach(function(c){c.classList.toggle('active',c.id==='tab-'+n);});
-  if(n==='charts')updateCharts();if(n==='history')renderHistory();if(n==='calendar')renderCalendar();if(n==='goals')renderGoals();if(n==='invest')renderInvestments();if(n==='networth')renderNetWorth();if(n==='lent')renderLent();if(n==='analyse')initAnalyse();
+  if(n==='history'){renderHistory();updateCharts();}if(n==='calendar')renderCalendar();if(n==='goals')renderGoals();if(n==='invest')renderInvestments();if(n==='networth')renderNetWorth();if(n==='lent')renderLent();if(n==='analyse')initAnalyse();
 }
 function initAnalyse(){
   /* populate month dropdown */
