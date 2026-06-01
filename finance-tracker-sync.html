@@ -2346,7 +2346,7 @@ function autoLogFixed(){
   var monthly=D.fixed.filter(function(f){return f.freq==='Monthly'&&f.recurring&&f.autoLog!==false&&(!f.skippedMonths||f.skippedMonths.indexOf(m)<0);});
   if(!monthly.length){D.autoLogged.push(m);autoSave();return;}
   var count=0;
-  monthly.forEach(function(f){var already=D.expenses.some(function(e){return e.month===m&&e.name===f.name&&e.amt===f.amt;});if(!already){var parts=m.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1,12,0,0).toISOString();D.expenses.push({id:Date.now().toString()+'_auto',date:ed,month:m,name:f.name,cat:f.cat||'Utilities',amt:f.amt,accountId:f.accountId||(D.accounts.length?D.accounts[0].id:''),note:'Auto-logged',tags:''});count++;}});
+  monthly.forEach(function(f){var already=D.expenses.some(function(e){return e.month===m&&e.name===f.name&&e.amt===f.amt;});if(!already){var parts=m.split('-'),yr=parseInt(parts[0]),mo=parseInt(parts[1])-1,dim=new Date(yr,mo+1,0).getDate(),day=Math.min(f.dueDay&&f.dueDay>0?f.dueDay:1,dim),ed=new Date(yr,mo,day,12,0,0).toISOString();D.expenses.push({id:Date.now().toString()+'_auto',date:ed,month:m,name:f.name,cat:f.cat||'Utilities',amt:f.amt,accountId:f.accountId||(D.accounts.length?D.accounts[0].id:''),note:'Auto-logged',tags:''});count++;}});
   D.autoLogged.push(m);autoSave();
   if(count>0){renderExpenses();recalc();showToast('Auto-logged '+count+' recurring expense'+(count>1?'s':'')+' for this month','success');}
 }
@@ -2751,11 +2751,18 @@ function calcHealthScore(){
 
   /* 1. Savings rate (25pts) */
   var savPts=0;
+  var _dayOfMonth=new Date().getDate();
+  var _hasExpenses=getExpenses().length>0;
   if(income>0&&savT>0){
-    savPts=Math.round(Math.min(25, savA/savT*25));
+    /* If it's early in the month and no expenses yet, be neutral not 0 */
+    if(_dayOfMonth<=5&&!_hasExpenses){
+      savPts=12;
+    } else {
+      savPts=Math.round(Math.min(25, savA/savT*25));
+    }
   } else if(income===0){ savPts=12; } /* no income set, neutral */
   score+=savPts;
-  factors.push({label:'Savings rate',pts:savPts,max:25,tip:income>0?(savA>=savT?'Meeting savings goal':'Saved '+fmt(savA)+' of '+fmt(savT)+' goal'):'Set income to track'});
+  factors.push({label:'Savings rate',pts:savPts,max:25,tip:income>0?(_dayOfMonth<=5&&!_hasExpenses?'Month just started':'Saved '+fmt(savA)+' of '+fmt(savT)+' goal'):'Set income to track'});
 
   /* 2. Budget control (20pts) */
   var budgets=D.budgets,budgetCats=Object.keys(budgets);
@@ -2774,12 +2781,18 @@ function calcHealthScore(){
   var recurring=D.fixed.filter(function(f){return f.recurring;});
   var paid=getPaid();
   var billPts=15;
+  var todayDay=new Date().getDate();
   if(recurring.length>0){
-    var paidCount=recurring.filter(function(f){return paid.indexOf(f.id)>-1;}).length;
-    billPts=Math.round(paidCount/recurring.length*15);
+    /* Grace period: first 5 days of month, don't penalize unpaid bills */
+    if(todayDay<=5){
+      billPts=15;
+    } else {
+      var paidCount=recurring.filter(function(f){return paid.indexOf(f.id)>-1;}).length;
+      billPts=Math.round(paidCount/recurring.length*15);
+    }
   }
   score+=billPts;
-  factors.push({label:'Bills paid',pts:billPts,max:15,tip:recurring.length===0?'No recurring bills':(billPts===15?'All bills marked paid':paid.length+'/'+recurring.length+' paid this month')});
+  factors.push({label:'Bills paid',pts:billPts,max:15,tip:recurring.length===0?'No recurring bills':(todayDay<=5?'Grace period (first 5 days)':(billPts===15?'All bills marked paid':paid.length+'/'+recurring.length+' paid this month'))});
 
   /* 4. Lent money (10pts) */
   var lent=D.lent||[];
