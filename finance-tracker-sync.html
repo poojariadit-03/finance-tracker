@@ -1139,9 +1139,9 @@ function recalc(){
   document.getElementById('s-income').textContent=fmt(income);
   var extraBox=document.getElementById('s-extra-box'),extraEl=document.getElementById('s-extra');
   if(extraInc>0){extraBox.style.display='block';extraEl.textContent='+'+fmt(extraInc);}else extraBox.style.display='none';
-  var spPct=totalIncome>0?(fxd+spent)/totalIncome*100:0,spBan=document.getElementById('spendBanner');
-  if(income>0&&spPct>=100){spBan.style.display='flex';document.getElementById('spendBannerText').textContent='🚨 Exceeded income! Spent '+fmt(fxd+spent)+' of '+fmt(totalIncome);}
-  else if(income>0&&spPct>=80){spBan.style.display='flex';document.getElementById('spendBannerText').textContent='⚠️ '+spPct.toFixed(0)+'% of income spent — only '+fmt(totalIncome-fxd-spent)+' left!';}
+  var spPct=totalIncome>0?spent/totalIncome*100:0,spBan=document.getElementById('spendBanner');
+  if(income>0&&(fxd+spent)>=totalIncome&&spent>0){spBan.style.display='flex';document.getElementById('spendBannerText').textContent='🚨 Exceeded income! Fixed+Spent '+fmt(fxd+spent)+' of '+fmt(totalIncome);}
+  else if(income>0&&spPct>=80){spBan.style.display='flex';document.getElementById('spendBannerText').textContent='⚠️ '+spPct.toFixed(0)+'% of income spent on expenses — only '+fmt(totalIncome-fxd-spent)+' left!';}
   else spBan.style.display='none';
   renderExtraIncome();checkSavingsStreak();
   document.getElementById('s-fixed').textContent=fmt(fxd);
