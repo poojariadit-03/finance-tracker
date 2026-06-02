@@ -2555,6 +2555,37 @@ function exportExcel(months){
   }
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(da),'Daily Analysis');
 
+  /* ── Salary History Sheet ── */
+  var sh=[['Salary History',''],['',''],['From Month','Monthly Salary (₹)','Notes']];
+  var salHistory=D.config.salaryHistory||[];
+  if(!salHistory.length&&D.config.income){
+    sh.push(['Not tracked yet',D.config.income,'Update income field to start tracking hikes']);
+  } else {
+    salHistory.forEach(function(h,i){
+      var p=h.from.split('-'),d=new Date(parseInt(p[0]),parseInt(p[1])-1,1);
+      var label=d.toLocaleString('default',{month:'long',year:'numeric'});
+      var isLatest=i===salHistory.length-1;
+      /* Calculate annual salary for that period */
+      var nextH=salHistory[i+1];
+      var nextM=nextH?nextH.from:null;
+      var monthsActive=0;
+      if(nextM){
+        var from=new Date(parseInt(p[0]),parseInt(p[1])-1,1);
+        var np=nextM.split('-'),to=new Date(parseInt(np[0]),parseInt(np[1])-1,1);
+        monthsActive=(to.getFullYear()-from.getFullYear())*12+(to.getMonth()-from.getMonth());
+      }
+      sh.push([label,h.amount,isLatest?'Current salary':(monthsActive>0?'Active for '+monthsActive+' month'+(monthsActive>1?'s':''):'')]);
+    });
+    sh.push(['','','']);
+    sh.push(['Current Salary',D.config.income||0,'']);
+    if(salHistory.length>1){
+      var first=salHistory[0],last=salHistory[salHistory.length-1];
+      var growth=first.amount>0?((last.amount-first.amount)/first.amount*100).toFixed(1):0;
+      sh.push(['Total growth since tracking',growth+'%','From ₹'+first.amount+' to ₹'+last.amount]);
+    }
+  }
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sh),'Salary History');
+
   XLSX.writeFile(wb,'finance-tracker-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
@@ -2902,6 +2933,25 @@ function exportReport(months){
     +'if(CL.length){new Chart(document.getElementById("cc"),{type:"doughnut",data:{labels:CL,datasets:[{data:CD,backgroundColor:CC2,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:"55%",plugins:{legend:{display:true,position:"right",labels:{font:{size:11},boxWidth:12,padding:8}}}}});}'
     +'}catch(e){}';
 
+  /* Salary history section */
+  var salHistorySection='';
+  var rSalHistory=D.config.salaryHistory||[];
+  if(rSalHistory.length){
+    var salRows=rSalHistory.slice().reverse().map(function(h,i){
+      var p=h.from.split('-'),d=new Date(parseInt(p[0]),parseInt(p[1])-1,1);
+      var label=d.toLocaleString('default',{month:'long',year:'numeric'});
+      var isLatest=i===0;
+      return '<tr><td>'+label+'</td><td style="color:#1D9E75;font-weight:600">₹'+Math.round(h.amount).toLocaleString('en-IN')+'</td><td>'+(isLatest?'<span style="background:#E1F5EE;color:#1D9E75;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px">Current</span>':'')+'</td></tr>';
+    }).join('');
+    var salGrowth='';
+    if(rSalHistory.length>1){
+      var sFirst=rSalHistory[0],sLast=rSalHistory[rSalHistory.length-1];
+      var sGrowth=sFirst.amount>0?((sLast.amount-sFirst.amount)/sFirst.amount*100).toFixed(1):0;
+      salGrowth='<div style="margin-top:10px;font-size:13px;color:#6B6A65">Total growth: <span style="font-weight:600;color:#1D9E75">+'+sGrowth+'%</span> (₹'+Math.round(sFirst.amount).toLocaleString('en-IN')+' → ₹'+Math.round(sLast.amount).toLocaleString('en-IN')+')</div>';
+    }
+    salHistorySection='<div class="sec"><div class="stitle">📈 Salary History</div><div class="card"><table><thead><tr><th>Effective From</th><th>Monthly Salary</th><th>Status</th></tr></thead><tbody>'+salRows+'</tbody></table>'+salGrowth+'</div></div>';
+  }
+
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report '+mStr+'</title>'
     +'<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"><\/script>'
     +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#F7F6F3;color:#1A1A18;font-size:15px}.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem}.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2rem}h1{font-size:24px;font-weight:700;margin-bottom:4px}.sub{color:#6B6A65;font-size:14px}.gen{font-size:11px;color:#9E9C97;margin-top:4px}.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:2rem}.sec{margin-bottom:2rem}.stitle{font-size:11px;font-weight:600;text-transform:uppercase;color:#9E9C97;margin-bottom:10px}.card{background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:1.25rem 1.5rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}.ch{position:relative;height:220px}table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:10px;font-weight:600;text-transform:uppercase;color:#9E9C97;text-align:left;padding:6px 8px;border-bottom:1px solid #E4E2DA}td{padding:8px;border-bottom:1px solid #E4E2DA;font-family:monospace}td:first-child{font-family:inherit;color:#6B6A65}.pbtn{position:fixed;bottom:24px;right:24px;background:#1A1A18;color:#fff;border:none;border-radius:99px;padding:12px 24px;font-size:14px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2)}@media print{.pbtn{display:none}}</style>'
@@ -2913,6 +2963,7 @@ function exportReport(months){
     +'<div class="card"><div class="stitle">Top Spending Categories</div>'+topCatHtml+'</div></div>'
     +'<div class="sec"><div class="stitle">Monthly Summary</div><div class="card"><div style="overflow-x:auto"><table><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Sav %</th><th>Balance</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div></div>'
     +dbdSection+dlSummary
+    +salHistorySection
     +'</div><button class="pbtn" onclick="window.print()">\uD83D\uDDB8 Print / Save PDF</button>'
     +'<script>'+sD+sC+'<\/script></body></html>';
 
