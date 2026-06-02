@@ -413,7 +413,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   </div>
   <div class="card">
     <div class="card-hd"><span class="ctitle">Income &amp; savings goal</span></div>
-    <div class="srow"><label>Monthly income</label><input type="number" id="income" placeholder="e.g. 50000" min="0" step="1000" style="max-width:180px" oninput="D.config.income=parseFloat(this.value)||0;autoSave();recalc()"></div>
+    <div class="srow"><label>Monthly income</label><input type="number" id="income" placeholder="e.g. 50000" min="0" step="1000" style="max-width:180px" oninput="updateIncome(parseFloat(this.value)||0)"></div>
     <div class="srow"><label>Salary account</label><select id="salaryAccSel" style="max-width:200px" onchange="D.config.salaryAccountId=this.value;autoSave();renderAccounts();"><option value="">— Not set —</option></select><span style="font-size:12px;color:var(--tx3);margin-left:8px">Which account receives your salary?</span></div>
     <div class="srow"><label>Credit day</label><input type="number" id="salaryCreditDay" placeholder="e.g. 1 or 5" min="1" max="28" style="max-width:100px" oninput="D.config.salaryCreditDay=parseInt(this.value)||1;autoSave();renderAccounts();"><span style="font-size:12px;color:var(--tx3);margin-left:8px">Day of month salary is credited</span></div>
     <div class="srow"><label>Savings goal</label><input type="range" id="savSlider" min="0" max="70" value="20" step="1" oninput="document.getElementById('pctOut').textContent=this.value+'%';D.config.savpct=parseInt(this.value);autoSave();recalc()"><span class="pct-out" id="pctOut">20%</span></div>
@@ -445,6 +445,13 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       </div>
     </div>
     <div id="extraIncList"><p class="empty">No extra income this month. Click + Add to log some!</p></div>
+  </div>
+  <div class="card">
+    <div class="card-hd">
+      <span class="ctitle">📈 Salary history</span>
+      <span style="font-size:12px;color:var(--tx3)">Auto-tracked when you change income</span>
+    </div>
+    <div id="salaryHistoryList"><p class="empty">No salary changes recorded yet.</p></div>
   </div>
 </div>
 <div class="tab-content" id="tab-accounts">
@@ -1520,27 +1527,77 @@ function removeAccount(id){
   autoSave();renderAccounts();populateAccSel();populateTransferSelects();
 }
 /* ═══ SALARY CREDIT HELPER ═══ */
+function updateIncome(val){
+  if(!val||val<=0)return;
+  var curM=mk();
+  /* Init salary history if not exists */
+  if(!D.config.salaryHistory)D.config.salaryHistory=[];
+  /* Only log if amount actually changed */
+  var last=D.config.salaryHistory.length?D.config.salaryHistory[D.config.salaryHistory.length-1]:null;
+  if(!last||last.amount!==val){
+    /* Remove any existing entry for this exact month (allow correction) */
+    D.config.salaryHistory=D.config.salaryHistory.filter(function(h){return h.from!==curM;});
+    D.config.salaryHistory.push({amount:val,from:curM});
+    D.config.salaryHistory.sort(function(a,b){return a.from.localeCompare(b.from);});
+  }
+  D.config.income=val;
+  autoSave();recalc();renderSalaryHistory();
+}
 function getSalaryCredits(accountId){
-  /* Returns total salary credited to this account since app start */
   if(!D.config.salaryAccountId||D.config.salaryAccountId!==accountId)return 0;
-  var income=D.config.income||0;
-  if(!income)return 0;
   var creditDay=D.config.salaryCreditDay||1;
   var now=new Date();
-  /* Count how many salary credits have happened up to today */
-  /* We go back 36 months max to find earliest expense/data */
+  /* Find earliest data point */
   var earliest=new Date();
   D.expenses.forEach(function(e){var d=new Date(e.date);if(d<earliest)earliest=d;});
   (D.extraIncome||[]).forEach(function(e){var d=new Date(e.date);if(d<earliest)earliest=d;});
-  /* Start counting from earliest data month */
-  var count=0;
+  /* Use salary history for accurate month-by-month calculation */
+  var history=D.config.salaryHistory&&D.config.salaryHistory.length?D.config.salaryHistory:[];
+  if(!history.length){
+    /* Fallback to current income if no history */
+    var income=D.config.income||0;
+    if(!income)return 0;
+    history=[{amount:income,from:'2000-01'}];
+  }
+  var total=0;
   var check=new Date(earliest.getFullYear(),earliest.getMonth(),1);
   while(check<=now){
-    var creditDate=new Date(check.getFullYear(),check.getMonth(),creditDay);
-    if(creditDate<=now)count++;
+    var checkM=check.getFullYear()+'-'+String(check.getMonth()+1).padStart(2,'0');
+    /* Find which salary applies to this month */
+    var applicable=history.filter(function(h){return h.from<=checkM;});
+    var salaryAmt=applicable.length?applicable[applicable.length-1].amount:0;
+    if(salaryAmt>0){
+      var creditDate=new Date(check.getFullYear(),check.getMonth(),creditDay);
+      if(creditDate<=now)total+=salaryAmt;
+    }
     check.setMonth(check.getMonth()+1);
   }
-  return count*income;
+  return total;
+}
+function renderSalaryHistory(){
+  var el=document.getElementById('salaryHistoryList');
+  if(!el)return;
+  var history=D.config.salaryHistory||[];
+  if(!history.length){el.innerHTML='<p class="empty">No salary changes recorded yet. Update your income above to start tracking.</p>';return;}
+  el.innerHTML=history.slice().reverse().map(function(h,i){
+    var p=h.from.split('-'),d=new Date(parseInt(p[0]),parseInt(p[1])-1,1);
+    var label=d.toLocaleString('default',{month:'long',year:'numeric'});
+    var isLatest=i===0;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px">'
+      +'<span style="color:var(--tx2)">From '+label+'</span>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-family:monospace;font-weight:600;color:var(--green)">'+fmt(h.amount)+'</span>'
+      +(isLatest?'<span style="background:var(--gbg);color:var(--green);font-size:10px;font-weight:600;padding:1px 7px;border-radius:99px">Current</span>':'')
+      +'<button class="del-btn" onclick="deleteSalaryHistory(\''+h.from+'\')">×</button>'
+      +'</div></div>';
+  }).join('');
+}
+function deleteSalaryHistory(fromMonth){
+  D.config.salaryHistory=(D.config.salaryHistory||[]).filter(function(h){return h.from!==fromMonth;});
+  if(D.config.salaryHistory.length){
+    D.config.income=D.config.salaryHistory[D.config.salaryHistory.length-1].amount;
+  }
+  autoSave();renderSalaryHistory();renderAccounts();
 }
 function renderAccounts(){
   var accs=D.accounts,grid=document.getElementById('accountGrid');
@@ -3326,7 +3383,7 @@ function renderAll(){
   var salDay=document.getElementById('salaryCreditDay');if(salDay&&D.config.salaryCreditDay)salDay.value=D.config.salaryCreditDay;
   renderAccounts();populateAccSel();populateTransferSelects();
   if(document.getElementById('fixedSummary'))renderFixedSummary();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();autoLogFixed();
-  renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();
+  renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();renderSalaryHistory();
   applyTheme(D.config.theme||'auto');applyFontSize(D.config.fontSize||'normal');updateLentBadge();renderLent();
   var incDt=document.getElementById('incDate');if(incDt)incDt.value=todayStr();
   if(D.config&&D.config.dailyLimit){var dli=document.getElementById('dailyLimitInput');if(dli)dli.value=D.config.dailyLimit;}
