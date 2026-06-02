@@ -414,6 +414,8 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <div class="card">
     <div class="card-hd"><span class="ctitle">Income &amp; savings goal</span></div>
     <div class="srow"><label>Monthly income</label><input type="number" id="income" placeholder="e.g. 50000" min="0" step="1000" style="max-width:180px" oninput="D.config.income=parseFloat(this.value)||0;autoSave();recalc()"></div>
+    <div class="srow"><label>Salary account</label><select id="salaryAccSel" style="max-width:200px" onchange="D.config.salaryAccountId=this.value;autoSave();renderAccounts();"><option value="">— Not set —</option></select><span style="font-size:12px;color:var(--tx3);margin-left:8px">Which account receives your salary?</span></div>
+    <div class="srow"><label>Credit day</label><input type="number" id="salaryCreditDay" placeholder="e.g. 1 or 5" min="1" max="28" style="max-width:100px" oninput="D.config.salaryCreditDay=parseInt(this.value)||1;autoSave();renderAccounts();"><span style="font-size:12px;color:var(--tx3);margin-left:8px">Day of month salary is credited</span></div>
     <div class="srow"><label>Savings goal</label><input type="range" id="savSlider" min="0" max="70" value="20" step="1" oninput="document.getElementById('pctOut').textContent=this.value+'%';D.config.savpct=parseInt(this.value);autoSave();recalc()"><span class="pct-out" id="pctOut">20%</span></div>
     <div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx3);margin-bottom:4px"><span>Savings progress</span><span id="savProg">₹0 / ₹0</span></div><div class="pbg"><div class="pfill" id="savBar" style="width:0%;background:var(--green)"></div></div></div>
   </div>
@@ -1408,6 +1410,29 @@ function removeAccount(id){
   D.accounts=D.accounts.filter(function(a){return a.id!==id;});
   autoSave();renderAccounts();populateAccSel();populateTransferSelects();
 }
+/* ═══ SALARY CREDIT HELPER ═══ */
+function getSalaryCredits(accountId){
+  /* Returns total salary credited to this account since app start */
+  if(!D.config.salaryAccountId||D.config.salaryAccountId!==accountId)return 0;
+  var income=D.config.income||0;
+  if(!income)return 0;
+  var creditDay=D.config.salaryCreditDay||1;
+  var now=new Date();
+  /* Count how many salary credits have happened up to today */
+  /* We go back 36 months max to find earliest expense/data */
+  var earliest=new Date();
+  D.expenses.forEach(function(e){var d=new Date(e.date);if(d<earliest)earliest=d;});
+  (D.extraIncome||[]).forEach(function(e){var d=new Date(e.date);if(d<earliest)earliest=d;});
+  /* Start counting from earliest data month */
+  var count=0;
+  var check=new Date(earliest.getFullYear(),earliest.getMonth(),1);
+  while(check<=now){
+    var creditDate=new Date(check.getFullYear(),check.getMonth(),creditDay);
+    if(creditDate<=now)count++;
+    check.setMonth(check.getMonth()+1);
+  }
+  return count*income;
+}
 function renderAccounts(){
   var accs=D.accounts,grid=document.getElementById('accountGrid');
   if(!accs.length){grid.innerHTML='<p class="empty" style="margin-bottom:1rem">No accounts yet.</p>';return;}
@@ -1417,7 +1442,8 @@ function renderAccounts(){
     var inc=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(t,e){return t+e.amt;},0);
     var tIn=(D.transfers||[]).filter(function(t){return t.toId===a.id;}).reduce(function(t2,t){return t2+t.amt;},0);
     var tOut=(D.transfers||[]).filter(function(t){return t.fromId===a.id;}).reduce(function(t2,t){return t2+t.amt;},0);
-    return s+(a.openingBalance+inc+tIn-tOut-sp);
+    var sal=getSalaryCredits(a.id);
+    return s+(a.openingBalance+inc+sal+tIn-tOut-sp);
   },0);
   var totalEl=document.getElementById('accTotalBal');
   if(totalEl){totalEl.textContent=fmt(totalBal);totalEl.style.color=totalBal>=0?'var(--green)':'var(--red)';}
@@ -1438,8 +1464,9 @@ function renderAccounts(){
     else lowBanner.style.display='none';
   }
   grid.innerHTML=accs.map(function(a,i){var spent=D.expenses.filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
-    var incIn=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0); /* BUG FIX: include extra income */
-    var tIn=(D.transfers||[]).filter(function(t){return t.toId===a.id;}).reduce(function(s,t){return s+t.amt;},0);var tOut=(D.transfers||[]).filter(function(t){return t.fromId===a.id;}).reduce(function(s,t){return s+t.amt;},0);var bal=a.openingBalance+incIn+tIn-tOut-spent,c=AC[i%AC.length];var utilHtml='';
+    var incIn=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
+    var sal=getSalaryCredits(a.id);
+    var tIn=(D.transfers||[]).filter(function(t){return t.toId===a.id;}).reduce(function(s,t){return s+t.amt;},0);var tOut=(D.transfers||[]).filter(function(t){return t.fromId===a.id;}).reduce(function(s,t){return s+t.amt;},0);var bal=a.openingBalance+incIn+sal+tIn-tOut-spent,c=AC[i%AC.length];var utilHtml='';
     if(a.type==='Credit Card'&&a.creditLimit>0){
       var util=Math.min(100,Math.abs(bal)/a.creditLimit*100);
       var utilCol=util>=80?'var(--red)':util>=50?'var(--amber)':'var(--green)';
@@ -1447,7 +1474,9 @@ function renderAccounts(){
     }
     var noteHtml=a.note?'<div style="font-size:10px;color:var(--tx3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+a.note+'">'+a.note+'</div>':'';
     var lowWarn=a.lowBalanceThreshold&&bal<a.lowBalanceThreshold?'<span style="background:var(--rbg);color:var(--red);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:6px">LOW</span>':'';
-    return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+lowWarn+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">'+fmt(bal)+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+fmt(spent)+'</div>'+noteHtml+utilHtml+'<div style="display:flex;gap:6px;margin-top:8px"><button onclick="openAccountStatement(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">📋</button><button onclick="openEditAccount(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">✏️</button></div><button class="adel" onclick="removeAccount(\''+a.id+'\')">×</button></div>';}).join('');
+    var salBadge=D.config.salaryAccountId===a.id?'<span style="background:var(--gbg);color:var(--green);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:6px">💰 SALARY</span>':'';
+    var salNote=D.config.salaryAccountId===a.id&&sal>0?'<div style="font-size:10px;color:var(--green);margin-top:2px">+'+fmt(sal)+' salary credited</div>':'';
+    return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+lowWarn+salBadge+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">'+fmt(bal)+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+fmt(spent)+'</div>'+salNote+noteHtml+utilHtml+'<div style="display:flex;gap:6px;margin-top:8px"><button onclick="openAccountStatement(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">📋</button><button onclick="openEditAccount(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">✏️</button></div><button class="adel" onclick="removeAccount(\''+a.id+'\')">×</button></div>';}).join('');
 }
 function populateAccSel(){var accs=D.accounts,sel=document.getElementById('expAcc');
   var fixAccSel=document.getElementById('fixAccId');
@@ -3180,6 +3209,12 @@ function renderAll(){
   var dateEl=document.getElementById('expDate');if(dateEl)dateEl.value=todayStr();
   populateCatSelects();renderCustomCategories();renderTemplates();
   var bcb=document.getElementById('budgetCarryover');if(bcb)bcb.checked=!!(D.config&&D.config.budgetCarryover);
+  /* Salary settings */
+  var salSel=document.getElementById('salaryAccSel');
+  if(salSel){
+    salSel.innerHTML='<option value="">— Not set —</option>'+D.accounts.map(function(a){return '<option value="'+a.id+'"'+(D.config.salaryAccountId===a.id?' selected':'')+'>'+a.name+'</option>';}).join('');
+  }
+  var salDay=document.getElementById('salaryCreditDay');if(salDay&&D.config.salaryCreditDay)salDay.value=D.config.salaryCreditDay;
   renderAccounts();populateAccSel();populateTransferSelects();
   if(document.getElementById('fixedSummary'))renderFixedSummary();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();autoLogFixed();
   renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();
@@ -3187,7 +3222,7 @@ function renderAll(){
   var incDt=document.getElementById('incDate');if(incDt)incDt.value=todayStr();
   if(D.config&&D.config.dailyLimit){var dli=document.getElementById('dailyLimitInput');if(dli)dli.value=D.config.dailyLimit;}
   var lentDt=document.getElementById('lentDate');if(lentDt)lentDt.value=todayStr();
-  var lentRetDt=document.getElementById('lentReturnBy');  /* ensure return-by stays blank */
+  var lentRetDt=document.getElementById('lentReturnBy');
   checkDueDayAutoPay();
 }
 
