@@ -460,6 +460,15 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <button onclick="document.getElementById('lowBalanceBanner').style.display='none'" style="background:var(--red)">Dismiss</button>
   </div>
   <div class="agrid" id="accountGrid"></div>
+  <div class="card" style="border-color:var(--amber);background:var(--abg)">
+    <div class="card-hd">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--amber)">⚠️ Balances looking wrong?</div>
+        <div style="font-size:12px;color:var(--tx2);margin-top:3px">Fix all accounts in one go — just enter what you actually have right now.</div>
+      </div>
+      <button class="btn" style="background:var(--amber);color:#fff;white-space:nowrap" onclick="startRecalibrate()">🔧 Fix all balances</button>
+    </div>
+  </div>
   <div class="card"><div class="card-hd"><span class="ctitle">Add account / wallet</span></div>
     <div class="irow">
       <input type="text" id="accName" placeholder="Name (e.g. HDFC Bank, GPay)">
@@ -693,6 +702,18 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <div id="eaCalcHint" style="font-size:12px;color:var(--green);margin-top:6px;display:none"></div>
     </div>
     <button class="btn" style="width:100%;margin-top:4px" onclick="saveEditAccount()">Save changes</button>
+  </div>
+</div>
+<div class="modal-ov" id="recalModal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-hd"><span class="modal-title">🔧 Fix all balances</span><button class="modal-cls" onclick="closeRecal()">×</button></div>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:16px">Open your banking app / count your cash and enter the <strong>actual amount you have right now</strong> in each account. The app will auto-fix the opening balances.</p>
+    <div id="recalFields"></div>
+    <div id="recalPreview" style="margin:12px 0;font-size:13px;color:var(--tx3)"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn" style="flex:1;background:var(--green)" onclick="applyRecalibrate()">✓ Fix balances</button>
+      <button class="btn-ghost" style="flex:1" onclick="closeRecal()">Cancel</button>
+    </div>
   </div>
 </div>
 <div class="modal-ov" id="accStmtModal">
@@ -1271,6 +1292,48 @@ function calcOpeningBalance(){
   hint.textContent='✓ Opening balance set to ₹'+Math.round(newOpening).toLocaleString('en-IN')+'. Click Save to apply.';
 }
 function closeEditAccount(){document.getElementById('editAccModal').classList.remove('show');_editAccId=null;}
+/* ═══ RECALIBRATE ALL ACCOUNTS ═══ */
+function startRecalibrate(){
+  var accs=D.accounts;
+  if(!accs.length){showToast('No accounts found','error');return;}
+  var html='';
+  accs.forEach(function(a){
+    var spent=D.expenses.filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
+    var incIn=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
+    var tIn=(D.transfers||[]).filter(function(t){return t.toId===a.id;}).reduce(function(s,t){return s+t.amt;},0);
+    var tOut=(D.transfers||[]).filter(function(t){return t.fromId===a.id;}).reduce(function(s,t){return s+t.amt;},0);
+    var curBal=a.openingBalance+incIn+tIn-tOut-spent;
+    html+='<div style="margin-bottom:12px;padding:10px 12px;background:var(--sur2);border-radius:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<span style="font-size:13px;font-weight:600">'+a.name+'</span>'
+      +'<span style="font-size:12px;color:'+(curBal<0?'var(--red)':'var(--tx3)')+'">Showing: '+fmt(Math.round(curBal))+'</span>'
+      +'</div>'
+      +'<input type="number" id="recal_'+a.id+'" placeholder="Actual balance I have now ₹" style="width:100%;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">'
+      +'</div>';
+  });
+  document.getElementById('recalFields').innerHTML=html;
+  document.getElementById('recalPreview').textContent='Leave blank any account you want to skip.';
+  document.getElementById('recalModal').classList.add('show');
+}
+function applyRecalibrate(){
+  var accs=D.accounts,changed=0;
+  accs.forEach(function(a){
+    var inp=document.getElementById('recal_'+a.id);
+    if(!inp||inp.value==='')return;
+    var actualBal=parseFloat(inp.value);
+    if(isNaN(actualBal))return;
+    var spent=D.expenses.filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
+    var incIn=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
+    var tIn=(D.transfers||[]).filter(function(t){return t.toId===a.id;}).reduce(function(s,t){return s+t.amt;},0);
+    var tOut=(D.transfers||[]).filter(function(t){return t.fromId===a.id;}).reduce(function(s,t){return s+t.amt;},0);
+    a.openingBalance=Math.round(actualBal+spent-incIn-tIn+tOut);
+    changed++;
+  });
+  if(!changed){showToast('Enter at least one balance to fix','error');return;}
+  autoSave();closeRecal();renderAccounts();recalc();
+  showToast('Fixed '+changed+' account'+(changed>1?'s':'')+' ✓','success');
+}
+function closeRecal(){document.getElementById('recalModal').classList.remove('show');}
 function saveEditAccount(){
   if(!_editAccId)return;
   var a=D.accounts.find(function(a){return a.id===_editAccId;});if(!a)return;
