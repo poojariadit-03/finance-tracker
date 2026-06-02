@@ -750,6 +750,51 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   </div>
 </div>
 
+<div class="modal-ov" id="quickSetupModal">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-hd"><span class="modal-title">👋 Quick Setup</span></div>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:18px;line-height:1.6">Let's set up your accounts properly so balances are always accurate. Takes 1 minute.</p>
+    <!-- Step 1: Bank -->
+    <div id="qs-step1">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">Step 1 of 3 — Your bank accounts</div>
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:12px">Enter the name of each account you use. We'll create them for you.</div>
+      <div class="irow" style="margin-bottom:8px">
+        <input type="text" id="qs-bank1" placeholder="Main bank name (e.g. HDFC, SBI)" style="flex:2">
+        <select id="qs-bank1-type" style="max-width:140px"><option>Bank Account</option><option>Savings Account</option></select>
+      </div>
+      <div class="irow" style="margin-bottom:8px">
+        <input type="text" id="qs-upi" placeholder="UPI app (e.g. PhonePe, GPay) — optional">
+        <select id="qs-upi-type" style="max-width:140px"><option>UPI</option><option>Wallet</option></select>
+      </div>
+      <div class="irow" style="margin-bottom:16px">
+        <input type="text" id="qs-cash" placeholder="Cash wallet name (e.g. Wallet) — optional">
+      </div>
+      <button class="btn" style="width:100%" onclick="qsStep(2)">Next →</button>
+    </div>
+    <!-- Step 2: Salary -->
+    <div id="qs-step2" style="display:none">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">Step 2 of 3 — Your salary</div>
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:12px">Which account does your salary land in, and when?</div>
+      <div class="srow" style="margin-bottom:10px"><label style="min-width:110px">Salary amount</label><input type="number" id="qs-income" placeholder="e.g. 39967" style="flex:1"></div>
+      <div class="srow" style="margin-bottom:10px"><label style="min-width:110px">Salary account</label><select id="qs-sal-acc" style="flex:1"></select></div>
+      <div class="srow" style="margin-bottom:16px"><label style="min-width:110px">Credit day</label><input type="number" id="qs-sal-day" placeholder="e.g. 1" min="1" max="28" style="max-width:80px"><span style="font-size:12px;color:var(--tx3);margin-left:8px">day of each month</span></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" onclick="qsStep(1)">← Back</button>
+        <button class="btn" style="flex:1" onclick="qsStep(3)">Next →</button>
+      </div>
+    </div>
+    <!-- Step 3: Current balances -->
+    <div id="qs-step3" style="display:none">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">Step 3 of 3 — Current balances</div>
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:12px">Open your banking app and enter what you actually have right now in each account.</div>
+      <div id="qs-bal-fields"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-ghost" onclick="qsStep(2)">← Back</button>
+        <button class="btn" style="flex:1;background:var(--green)" onclick="applyQuickSetup()">✓ All done!</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal-ov" id="monthResetModal"><div class="modal-box"><div class="modal-hd"><span class="modal-title">🗓️ New Month!</span><button class="modal-cls" onclick="closeMonthReset()">×</button></div><div id="monthResetBody"></div><div style="margin-top:16px;display:flex;gap:10px"><button class="btn" style="flex:1" onclick="closeMonthReset()">Let's go! 🚀</button><button class="btn-ghost" onclick="closeMonthReset()">Dismiss</button></div></div></div>
 <div class="modal-ov" id="autoContribModal"><div class="modal-box"><div class="modal-hd"><span class="modal-title">⚙️ Auto-contribution</span><button class="modal-cls" onclick="document.getElementById('autoContribModal').classList.remove('show')">×</button></div><p style="font-size:13px;color:var(--tx2);margin-bottom:14px">Set a fixed monthly amount to auto-add to this goal.</p><div id="autoContribGoalName" style="font-size:15px;font-weight:600;margin-bottom:14px"></div><div class="irow"><input type="number" id="autoContribAmt" placeholder="Monthly ₹" min="0" style="flex:1"><input type="number" id="autoContribDay" placeholder="Day of month e.g. 5" min="1" max="28" style="max-width:155px"></div><div style="font-size:12px;color:var(--tx3);margin-bottom:14px">Enter 0 to disable.</div><button class="btn" style="width:100%" onclick="saveAutoContrib()">Save</button></div></div>
 <div class="modal-ov" id="exportModal">
@@ -955,6 +1000,10 @@ function loadFromFirebase(){
     document.getElementById('app').style.display='block';
     updateHeader();renderAll();setSyncStatus('synced');
     listenForChanges();
+    /* Show quick setup if not done yet */
+    if(!D.config.setupDone){
+      setTimeout(function(){startQuickSetup();},800);
+    }
   }).catch(function(e){
     document.getElementById('loadingTxt').textContent='Error loading data: '+e.message;
   });
@@ -1336,6 +1385,66 @@ function applyRecalibrate(){
   showToast('Fixed '+changed+' account'+(changed>1?'s':'')+' ✓','success');
 }
 function closeRecal(){document.getElementById('recalModal').classList.remove('show');}
+
+/* ═══ QUICK SETUP ═══ */
+var _qsAccounts=[];
+function startQuickSetup(){
+  document.getElementById('quickSetupModal').classList.add('show');
+  qsStep(1);
+}
+function qsStep(n){
+  [1,2,3].forEach(function(i){document.getElementById('qs-step'+i).style.display=i===n?'block':'none';});
+  if(n===2){
+    /* populate salary account dropdown from step 1 inputs */
+    var accs=_qsGetAccounts();
+    var sel=document.getElementById('qs-sal-acc');
+    sel.innerHTML=accs.map(function(a,i){return '<option value="'+i+'">'+a.name+'</option>';}).join('');
+  }
+  if(n===3){
+    var accs=_qsGetAccounts();
+    var html=accs.map(function(a,i){
+      return '<div style="margin-bottom:10px;padding:10px 12px;background:var(--sur2);border-radius:10px">'
+        +'<div style="font-size:13px;font-weight:600;margin-bottom:7px">'+a.name+'</div>'
+        +'<input type="number" id="qs-bal-'+i+'" placeholder="Current balance ₹ (can be 0)" style="width:100%;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">'
+        +'</div>';
+    }).join('');
+    document.getElementById('qs-bal-fields').innerHTML=html||'<p class="empty">Enter account names in Step 1 first.</p>';
+  }
+}
+function _qsGetAccounts(){
+  var accs=[];
+  var b1=document.getElementById('qs-bank1').value.trim();
+  var upi=document.getElementById('qs-upi').value.trim();
+  var cash=document.getElementById('qs-cash').value.trim();
+  if(b1)accs.push({name:b1,type:document.getElementById('qs-bank1-type').value});
+  if(upi)accs.push({name:upi,type:document.getElementById('qs-upi-type').value});
+  if(cash)accs.push({name:cash,type:'Cash'});
+  return accs;
+}
+function applyQuickSetup(){
+  var accs=_qsGetAccounts();
+  if(!accs.length){showToast('Enter at least one account name','error');return;}
+  var income=parseFloat(document.getElementById('qs-income').value)||0;
+  var salIdx=parseInt(document.getElementById('qs-sal-acc').value)||0;
+  var salDay=parseInt(document.getElementById('qs-sal-day').value)||1;
+  /* Create new accounts, replacing defaults */
+  var newAccounts=accs.map(function(a,i){
+    var actualBal=parseFloat(document.getElementById('qs-bal-'+i).value)||0;
+    var id=Date.now().toString()+'_'+i;
+    return {id:id,name:a.name,type:a.type,openingBalance:actualBal,note:'',creditLimit:0,lowBalanceThreshold:0};
+  });
+  /* Remove default accounts, add new ones */
+  D.accounts=newAccounts;
+  /* Set income and salary config */
+  if(income>0)D.config.income=income;
+  D.config.salaryAccountId=newAccounts[salIdx]?newAccounts[salIdx].id:'';
+  D.config.salaryCreditDay=salDay;
+  D.config.setupDone=true;
+  autoSave();
+  document.getElementById('quickSetupModal').classList.remove('show');
+  renderAll();
+  showToast('Setup complete! Your accounts are ready ✓','success');
+}
 function saveEditAccount(){
   if(!_editAccId)return;
   var a=D.accounts.find(function(a){return a.id===_editAccId;});if(!a)return;
