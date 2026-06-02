@@ -1437,9 +1437,6 @@ function _qsGetAccounts(){
   if(cash)accs.push({name:cash,type:'Cash'});
   return accs;
 }
-  if(cash)accs.push({name:cash,type:'Cash'});
-  return accs;
-}
 function applyQuickSetup(){
   var accs=_qsGetAccounts();
   if(!accs.length){showToast('Enter at least one account name','error');return;}
