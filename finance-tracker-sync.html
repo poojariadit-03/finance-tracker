@@ -1086,7 +1086,7 @@ function listenForChanges(){
         if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.occasions)fresh.occasions=[];if(!fresh.lent)fresh.lent=[];
         if(!fresh.liabilities)fresh.liabilities=[];
         if(!fresh.config)fresh.config={};if(!fresh.config.dailyLimit)fresh.config.dailyLimit=0;
-        if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;renderAll();}
+        if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;var _wasUnlocked=_incomeUnlocked;renderAll();_incomeUnlocked=_wasUnlocked;applyIncomeLock();}
       }catch(e){}
     }
   });
