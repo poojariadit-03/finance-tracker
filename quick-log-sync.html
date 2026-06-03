@@ -301,6 +301,7 @@ input[type=date]:focus{border-color:var(--green)}
       <button class="mode-btn active-exp" id="modeExpBtn" onclick="setMode('expense')">💸 Expense</button>
       <button class="mode-btn" id="modeIncBtn" onclick="setMode('income')">💰 Income</button>
       <button class="mode-btn" id="modeLentBtn" onclick="setMode('lent')">💸 Lent</button>
+      <button class="mode-btn" id="modeTransBtn" onclick="setMode('transfer')">🔄 Transfer</button>
     </div>
     <div class="field-label" id="descLabel">What did you buy?</div>
     <button class="scan-btn" id="scanBtn" onclick="triggerScan()">📷 Scan receipt / UPI screenshot</button>
@@ -348,6 +349,15 @@ input[type=date]:focus{border-color:var(--green)}
     <div id="lentFields" style="display:none">
       <div class="field-label">Return by (optional)</div>
       <input type="date" id="lentReturnByQL" class="desc-input" style="margin-bottom:14px">
+    </div>
+    <!-- TRANSFER PANEL -->
+    <div id="transferFields" style="display:none">
+      <div class="field-label">From account</div>
+      <select id="qlTransFrom" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;font-size:15px;color:var(--tx);font-family:inherit;outline:none;margin-bottom:14px"></select>
+      <div class="field-label">To account</div>
+      <select id="qlTransTo" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;font-size:15px;color:var(--tx);font-family:inherit;outline:none;margin-bottom:14px"></select>
+      <div class="field-label">Note (optional)</div>
+      <input type="text" class="desc-input" id="qlTransNote" placeholder="e.g. ATM withdrawal">
     </div>
     <button class="copy-last-btn" id="copyLastBtn" onclick="copyLast()" style="display:none"></button>
     <button class="add-btn" id="addBtn" onclick="handleAdd()">+ Add Expense</button>
@@ -1014,10 +1024,30 @@ function initSwipes(){
 var INC_SOURCES=[{key:'Pocket Money',icon:'💵'},{key:'Freelance',icon:'💻'},{key:'Gift',icon:'🎁'},{key:'Business',icon:'🏪'},{key:'Bonus',icon:'🎯'},{key:'Other',icon:'💰'}];
 function setMode(m){
   var isLent=m==='lent';
+  var isTransfer=m==='transfer';
   var lentF=document.getElementById('lentFields');
+  var transF=document.getElementById('transferFields');
   if(lentF)lentF.style.display=isLent?'block':'none';
+  if(transF)transF.style.display=isTransfer?'block':'none';
   var modeLentBtn=document.getElementById('modeLentBtn');
+  var modeTransBtn=document.getElementById('modeTransBtn');
   if(modeLentBtn)modeLentBtn.className='mode-btn'+(isLent?' active-exp':'');
+  if(modeTransBtn)modeTransBtn.className='mode-btn'+(isTransfer?' active-exp':'');
+  ['descLabel','expName','noteLabel','expNote','expTags','catGrid','incGrid'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=isTransfer?'none':'';});
+  if(isTransfer){
+    mode='transfer';
+    var accs=D.accounts||[];
+    var opts=accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join('');
+    document.getElementById('qlTransFrom').innerHTML=opts;
+    document.getElementById('qlTransTo').innerHTML=opts;
+    if(accs.length>1)document.getElementById('qlTransTo').selectedIndex=1;
+    document.getElementById('qlTransNote').value='';
+    var btn=document.getElementById('addBtn');
+    btn.textContent='🔄 Transfer';btn.className='add-btn income';
+    document.getElementById('modeExpBtn').className='mode-btn';
+    document.getElementById('modeIncBtn').className='mode-btn';
+    amtStr='';updateAmt();return;
+  }
   if(isLent){
     document.getElementById('descLabel').textContent='Who are you lending to?';
     document.getElementById('expName').placeholder='Person name e.g. Rahul';
@@ -1029,14 +1059,12 @@ function setMode(m){
     var btn=document.getElementById('addBtn');
     btn.textContent='+ Add Lent';btn.className='add-btn';
     amtStr='';updateAmt();mode='lent';
-    // reset other buttons
     document.getElementById('modeExpBtn').className='mode-btn';
     document.getElementById('modeIncBtn').className='mode-btn';
     return;
   }
-
   mode=m;var isInc=m==='income';
-  document.getElementById('modeExpBtn').className='mode-btn'+(isInc?'':' active-exp');
+  document.getElementById('modeExpBtn').className='mode-btn'+(isInc?'': ' active-exp');
   document.getElementById('modeIncBtn').className='mode-btn'+(isInc?' active-inc':'');
   document.getElementById('descLabel').textContent=isInc?'What is this income?':'What did you buy?';
   document.getElementById('expName').placeholder=isInc?'e.g. Pocket money from dad, Freelance...':'e.g. Zomato biryani, Auto, Medicine...';
@@ -1073,7 +1101,25 @@ function addLentQL(){
   renderList();updateLentAlertQL();
 }
 
-function handleAdd(){if(mode==='income')addIncome();else if(mode==='lent')addLentQL();else addExpense();}
+function handleAdd(){if(mode==='income')addIncome();else if(mode==='lent')addLentQL();else if(mode==='transfer')doTransferQL();else addExpense();}
+function doTransferQL(){
+  var fromId=document.getElementById('qlTransFrom').value;
+  var toId=document.getElementById('qlTransTo').value;
+  var amt=parseFloat(amtStr);
+  var note=document.getElementById('qlTransNote').value.trim();
+  if(!fromId||!toId){showToast('Select accounts','error');return;}
+  if(fromId===toId){showToast('From and To cannot be same account','error');return;}
+  if(!amt||amt<=0){showToast('Enter amount','error');return;}
+  var fromAcc=D.accounts.find(function(a){return a.id===fromId;});
+  var toAcc=D.accounts.find(function(a){return a.id===toId;});
+  if(!D.transfers)D.transfers=[];
+  D.transfers.push({id:Date.now().toString(),fromId:fromId,toId:toId,fromName:fromAcc.name,toName:toAcc.name,amt:amt,date:new Date().toISOString(),note:note||''});
+  autoSave();
+  amtStr='';updateAmt();
+  document.getElementById('qlTransNote').value='';
+  if(navigator.vibrate)navigator.vibrate(50);
+  showToast('Transferred '+fmt(amt)+' from '+fromAcc.name+' to '+toAcc.name,'success');
+}
 function addIncome(){
   var name=document.getElementById('expName').value.trim(),note=document.getElementById('expNote').value.trim(),amt=parseFloat(amtStr),dv=document.getElementById('expDate').value||todayStr();
   if(!name){showToast('Enter a description','error');return;}
