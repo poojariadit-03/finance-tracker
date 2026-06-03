@@ -3718,7 +3718,7 @@ function setHistRange(val,btn){
     else if(val===30)titleEl.textContent='Last 30 days';
     else titleEl.textContent=val+'-month comparison';
   }
-  if(val<=30){
+  if(val===15||val===30){
     _histRangeDays=val;
     _histRangeMonths=0;
     renderHistoryDays(val);
