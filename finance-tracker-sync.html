@@ -3138,24 +3138,49 @@ function saveIncomePassword(){
 }
 
 function applyIncomeLock(){
+  var locked=hasIncomePassword()&&!_incomeUnlocked;
   var lockBtn=document.getElementById('incomeLockBtn');
+  if(lockBtn)lockBtn.textContent=locked?'🔒':'🔓';
+  var MASK='₹ ••••';
+  /* Metric cards */
   var incomeMetric=document.getElementById('s-income');
   var balanceMetric=document.getElementById('s-balance');
   var savingsMetric=document.getElementById('s-savings');
+  var extraEl=document.getElementById('s-extra');
+  var fixedEl=document.getElementById('s-fixed');
+  if(incomeMetric&&locked)incomeMetric.textContent=MASK;
+  if(balanceMetric&&locked){balanceMetric.textContent=MASK;balanceMetric.className='mval';}
+  if(savingsMetric&&locked)savingsMetric.textContent=MASK;
+  if(extraEl&&locked)extraEl.textContent=MASK;
+  if(fixedEl&&locked)fixedEl.textContent=MASK;
+  /* Income input field */
   var incomeInput=document.getElementById('income');
-  var extraBox=document.getElementById('s-extra');
-  var locked=hasIncomePassword()&&!_incomeUnlocked;
-  /* Update lock button */
-  if(lockBtn)lockBtn.textContent=locked?'🔒':'🔓';
-  /* Hide/show income metric */
-  if(incomeMetric)incomeMetric.textContent=locked?'₹ ••••':fmt(D.config.income||0);
-  /* Hide/show balance and savings */
-  if(balanceMetric&&locked){balanceMetric.textContent='₹ ••••';}
-  if(savingsMetric&&locked){savingsMetric.textContent='₹ ••••';}
-  /* Hide/show income input */
   if(incomeInput)incomeInput.type=locked?'password':'number';
-  /* Hide extra income */
-  if(extraBox&&locked)extraBox.textContent='₹ ••••';
+  /* Savings progress */
+  var savProg=document.getElementById('savProg');
+  if(savProg&&locked)savProg.textContent='•••• / ••••';
+  /* Budget health */
+  var budgetHealth=document.getElementById('budgetHealth');
+  if(budgetHealth&&locked)budgetHealth.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">🔒 Unlock to view budget health</div>';
+  /* Monthly summary */
+  var monthlySummary=document.getElementById('monthlySummary');
+  if(monthlySummary&&locked)monthlySummary.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">🔒 Unlock to view monthly summary</div>';
+  /* Extra income card total */
+  var extraIncTotal=document.getElementById('extraIncTotal');
+  if(extraIncTotal&&locked)extraIncTotal.textContent='••••';
+  /* Report/Excel buttons */
+  var reportBtn=document.querySelector('button[onclick*="openExportModal"]');
+  /* Disable export buttons when locked */
+  document.querySelectorAll('button[onclick*="openExportModal"]').forEach(function(btn){
+    if(locked){
+      btn.dataset.origOnclick=btn.getAttribute('onclick');
+      btn.setAttribute('onclick','showToast(\'🔒 Unlock income first to export\',\'error\')');
+      btn.style.opacity='0.5';
+    } else {
+      if(btn.dataset.origOnclick){btn.setAttribute('onclick',btn.dataset.origOnclick);}
+      btn.style.opacity='1';
+    }
+  });
 }
 function applyTheme(t){document.body.classList.remove('force-light','force-dark');if(t==='light')document.body.classList.add('force-light');if(t==='dark')document.body.classList.add('force-dark');var btn=document.getElementById('themeBtn');if(btn)btn.textContent=t==='dark'?'☀️':t==='light'?'🌙':'auto';}
 function toggleTheme(){var ts=['auto','light','dark'],cur=D.config.theme||'auto',nxt=ts[(ts.indexOf(cur)+1)%3];D.config.theme=nxt;autoSave();applyTheme(nxt);}
