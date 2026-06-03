@@ -2854,15 +2854,16 @@ function renderWeeklySummary(){
 }
 /* -- AUTO LOG FIXED -- */
 function autoLogFixed(){
-  if(!D.autoLogged)D.autoLogged=[];
-  var m=mk();
-  if(D.autoLogged.indexOf(m)>-1)return;
-  var monthly=D.fixed.filter(function(f){return f.freq==='Monthly'&&f.recurring&&f.autoLog!==false&&(!f.skippedMonths||f.skippedMonths.indexOf(m)<0);});
-  if(!monthly.length){D.autoLogged.push(m);autoSave();return;}
-  var count=0;
-  monthly.forEach(function(f){var already=D.expenses.some(function(e){return e.month===m&&e.name===f.name&&e.amt===f.amt;});if(!already){var parts=m.split('-'),yr=parseInt(parts[0]),mo=parseInt(parts[1])-1,dim=new Date(yr,mo+1,0).getDate(),day=Math.min(f.dueDay&&f.dueDay>0?f.dueDay:1,dim),ed=new Date(yr,mo,day,12,0,0).toISOString();D.expenses.push({id:Date.now().toString()+'_auto',date:ed,month:m,name:f.name,cat:f.cat||'Utilities',amt:f.amt,accountId:f.accountId||(D.accounts.length?D.accounts[0].id:''),note:'Auto-logged',tags:''});count++;}});
-  D.autoLogged.push(m);autoSave();
-  if(count>0){renderExpenses();recalc();showToast('Auto-logged '+count+' recurring expense'+(count>1?'s':'')+' for this month','success');}
+  /* Fixed expenses should NEVER be in the expenses list — they are counted
+     separately via fixedMonthly(). Remove any previously auto-logged entries. */
+  var before=D.expenses.length;
+  D.expenses=D.expenses.filter(function(e){
+    return !(e.id&&e.id.indexOf('_auto')>-1) && !(e.note==='Auto-logged');
+  });
+  if(D.expenses.length<before){
+    autoSave();renderExpenses();recalc();
+    showToast('Removed '+(before-D.expenses.length)+' duplicate fixed expense entries','info');
+  }
 }
 /* -- EDIT EXPENSE -- */
 var editingId=null;
