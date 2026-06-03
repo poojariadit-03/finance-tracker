@@ -3149,42 +3149,54 @@ function applyIncomeLock(){
   var lockBtn=document.getElementById('incomeLockBtn');
   if(lockBtn)lockBtn.textContent=locked?'🔒':'🔓';
   var MASK='₹ ••••';
+  var income=D.config.income||0;
+  var fxd=fixedMonthly();
+  var extraInc=extraIncomeTotal();
+  var totalIncome=income+extraInc;
+  var spent=getExpenses().reduce(function(s,e){return s+e.amt;},0);
+  var savA=Math.max(0,totalIncome-fxd-spent);
+  var bal=totalIncome-fxd-spent;
   /* Metric cards */
   var incomeMetric=document.getElementById('s-income');
   var balanceMetric=document.getElementById('s-balance');
   var savingsMetric=document.getElementById('s-savings');
-  var extraEl=document.getElementById('s-extra');
   var fixedEl=document.getElementById('s-fixed');
-  if(incomeMetric&&locked)incomeMetric.textContent=MASK;
-  if(balanceMetric&&locked){balanceMetric.textContent=MASK;balanceMetric.className='mval';}
-  if(savingsMetric&&locked)savingsMetric.textContent=MASK;
-  if(extraEl&&locked)extraEl.textContent=MASK;
-  if(fixedEl&&locked)fixedEl.textContent=MASK;
-  /* Income input field */
+  var extraEl=document.getElementById('s-extra');
+  if(incomeMetric)incomeMetric.textContent=locked?MASK:fmt(income);
+  if(balanceMetric){balanceMetric.textContent=locked?MASK:fmt(bal);balanceMetric.className='mval '+(locked?'':(bal>=0?'green':'red'));}
+  if(savingsMetric)savingsMetric.textContent=locked?MASK:fmt(savA);
+  if(fixedEl)fixedEl.textContent=locked?MASK:fmt(fxd);
+  if(extraEl&&extraInc>0)extraEl.textContent=locked?MASK:'+'+fmt(extraInc);
+  /* Income input */
   var incomeInput=document.getElementById('income');
-  if(incomeInput)incomeInput.type=locked?'password':'number';
+  if(incomeInput){incomeInput.type=locked?'password':'number';if(!locked)incomeInput.value=income||'';}
   /* Savings progress */
   var savProg=document.getElementById('savProg');
-  if(savProg&&locked)savProg.textContent='•••• / ••••';
+  var savT=totalIncome*(D.config.savpct||20)/100;
+  if(savProg)savProg.textContent=locked?'•••• / ••••':fmt(savA)+' / '+fmt(savT);
+  var bar=document.getElementById('savBar');
+  if(bar){var pct=savT>0?Math.min(100,savA/savT*100):0;bar.style.width=locked?'0%':pct.toFixed(1)+'%';}
   /* Budget health */
-  var budgetHealth=document.getElementById('budgetHealth');
-  if(budgetHealth&&locked)budgetHealth.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">🔒 Unlock to view budget health</div>';
+  var bh=document.getElementById('budgetHealth');
+  if(bh){
+    if(locked){bh.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">🔒 Unlock to view budget health</div>';}
+    else{var rows=[{l:'Fixed expenses',v:fxd,p:totalIncome>0?fxd/totalIncome*100:0,c:'var(--red)'},{l:'Daily spending',v:spent,p:totalIncome>0?spent/totalIncome*100:0,c:'#D4537E'},{l:'Savings',v:savA,p:totalIncome>0?savA/totalIncome*100:0,c:'var(--green)'}];bh.innerHTML=rows.map(function(r){return '<div class="hrow"><div class="hlabel"><span>'+r.l+'</span><span style="font-family:\'DM Mono\',monospace;font-weight:500">'+fmt(r.v)+' <span style="color:'+(r.p>=80?'var(--red)':r.p>=50?'var(--amber)':'var(--green)')+'">('+r.p.toFixed(1)+'%)</span></span></div><div class="pbg"><div class="pfill" style="width:'+Math.min(100,r.p).toFixed(1)+'%;background:'+r.c+'"></div></div></div>';}).join('');}
+  }
   /* Monthly summary */
-  var monthlySummary=document.getElementById('monthlySummary');
-  if(monthlySummary&&locked)monthlySummary.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">🔒 Unlock to view monthly summary</div>';
-  /* Extra income card total */
-  var extraIncTotal=document.getElementById('extraIncTotal');
-  if(extraIncTotal&&locked)extraIncTotal.textContent='••••';
+  var ms=document.getElementById('monthlySummary');
+  if(ms&&locked)ms.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">🔒 Unlock to view monthly summary</div>';
+  else if(ms&&!locked)renderMonthlySummary();
+  /* Extra income total */
+  var eit=document.getElementById('extraIncTotal');
+  if(eit)eit.textContent=locked?'••••':(extraInc>0?'+'+fmt(extraInc):'');
   /* Report/Excel buttons */
-  var reportBtn=document.querySelector('button[onclick*="openExportModal"]');
-  /* Disable export buttons when locked */
   document.querySelectorAll('button[onclick*="openExportModal"]').forEach(function(btn){
     if(locked){
-      btn.dataset.origOnclick=btn.getAttribute('onclick');
+      if(!btn.dataset.origOnclick)btn.dataset.origOnclick=btn.getAttribute('onclick');
       btn.setAttribute('onclick','showToast(\'🔒 Unlock income first to export\',\'error\')');
       btn.style.opacity='0.5';
     } else {
-      if(btn.dataset.origOnclick){btn.setAttribute('onclick',btn.dataset.origOnclick);}
+      if(btn.dataset.origOnclick){btn.setAttribute('onclick',btn.dataset.origOnclick);btn.dataset.origOnclick='';}
       btn.style.opacity='1';
     }
   });
