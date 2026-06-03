@@ -3081,7 +3081,8 @@ function addLent(){
   if(fromAccId){
     var acc=D.accounts.find(function(a){return a.id===fromAccId;});
     if(acc){
-      D.expenses.push({id:Date.now().toString()+'_lent',date:new Date(date+'T12:00:00').toISOString(),month:date.slice(0,7),name:'Lent to '+name,cat:'Other',amt:amt,accountId:fromAccId,note:'Auto-lent',isLentEntry:true,lentId:entry.id});
+      var lentIso=date.length===10?new Date(date+'T12:00:00').toISOString():date;
+      D.expenses.push({id:Date.now().toString()+'_lent',date:lentIso,month:date.slice(0,7),name:'Lent to '+name,cat:'Other',amt:amt,accountId:fromAccId,note:'Auto-lent',isLentEntry:true,lentId:entry.id});
     }
   }
   autoSave();
@@ -3141,7 +3142,9 @@ function applyLentPaid(){
   if(toAccId){
     var acc=D.accounts.find(function(a){return a.id===toAccId;});
     if(acc){
-      (D.extraIncome=D.extraIncome||[]).push({id:Date.now().toString()+'_lr',date:new Date(paidDate+'T12:00:00').toISOString(),month:paidDate.slice(0,7),name:'Received from '+entry.name,source:'Other',amt:paidAmt,accountId:toAccId,isLentReturn:true,lentId:entry.id});
+      if(!D.extraIncome)D.extraIncome=[];
+      var retIso=paidDate.length===10?new Date(paidDate+'T12:00:00').toISOString():paidDate;
+      D.extraIncome.push({id:Date.now().toString()+'_lr',date:retIso,month:paidDate.slice(0,7),name:'Received from '+entry.name,source:'Other',amt:paidAmt,accountId:toAccId,isLentReturn:true,lentId:entry.id});
     }
   }
   if(paidAmt>=entry.amt){
