@@ -628,7 +628,7 @@ function addExpense(forceOverride){
     var limit=parseFloat(localStorage.getItem(LSDLIMIT)||0);
     if(limit>0){
       var parts2=dv.split('-'),selDay2=parseInt(parts2[2]),selMonth2=parts2[0]+'-'+parts2[1];
-      var todaySpent=(D.expenses||[]).filter(function(e){return e.month===selMonth2&&new Date(e.date).getDate()===selDay2;}).reduce(function(s,e){return s+e.amt;},0);
+      var todaySpent=(D.expenses||[]).filter(function(e){return e.month===selMonth2&&parseInt(e.date.slice(8,10))===selDay2;}).reduce(function(s,e){return s+e.amt;},0);
       if(todaySpent+amt>limit){
         hardStopPending={name:name,note:note,amt:amt,dv:dv};
         document.getElementById('hardstopMsg').textContent='Adding '+fmt(amt)+' would bring today\'s total to '+fmt(todaySpent+amt)+' (limit: '+fmt(limit)+')';
@@ -680,7 +680,7 @@ function showAfterAddFeedback(amt,dv){
   var fb=document.getElementById('addFeedback');
   if(!limit){fb.classList.remove('show');return;}
   var parts=dv.split('-'),selDay=parseInt(parts[2]),selMonth=parts[0]+'-'+parts[1];
-  var todaySpent=(D.expenses||[]).filter(function(e){return e.month===selMonth&&new Date(e.date).getDate()===selDay;}).reduce(function(s,e){return s+e.amt;},0);
+  var todaySpent=(D.expenses||[]).filter(function(e){return e.month===selMonth&&parseInt(e.date.slice(8,10))===selDay;}).reduce(function(s,e){return s+e.amt;},0);
   var left=limit-todaySpent,pct=Math.min(100,todaySpent/limit*100);
   var cls=pct<70?'ok':pct<90?'warn':'over';
   var msg=left>0?'Today: '+fmt(todaySpent)+' of '+fmt(limit)+' — <strong>'+fmt(left)+' left</strong>':'<strong>Daily limit exceeded</strong> by '+fmt(-left);
@@ -749,11 +749,11 @@ function renderList(){
       if(!matches)return false;
       return e.month===selMonth; /* search across whole month */
     }
-    return e.month===selMonth&&new Date(e.date).getDate()===selDay;
+    return e.month===selMonth&&parseInt(e.date.slice(8,10))===selDay;
   });
   var todayInc=(D.extraIncome||[]).filter(function(e){
     if(_viewAll){if(_qlSearchQ){var mm=e.name.toLowerCase().indexOf(_qlSearchQ)>-1||(e.note&&e.note.toLowerCase().indexOf(_qlSearchQ)>-1);if(!mm)return false;}return true;}
-    return e.month===selMonth&&new Date(e.date).getDate()===selDay;
+    return e.month===selMonth&&parseInt(e.date.slice(8,10))===selDay;
   });
   var el=document.getElementById('expList');
   var expTotal=todayExps.reduce(function(s,e){return s+e.amt;},0);
