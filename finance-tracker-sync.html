@@ -782,12 +782,8 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
         <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">💰 Monthly salary amount</div>
         <input type="number" id="qs-income" placeholder="e.g. 39967" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">
       </div>
-      <div style="margin-bottom:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">🏦 Which account does salary land in?</div>
-        <select id="qs-sal-acc" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none"></select>
-      </div>
       <div style="margin-bottom:20px">
-        <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">📅 Which day of the month does it arrive?</div>
+        <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">📅 Which day of the month does salary arrive?</div>
         <input type="number" id="qs-sal-day" placeholder="e.g. 1 or 5" min="1" max="28" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">
       </div>
       <div style="display:flex;gap:8px">
@@ -1416,8 +1412,27 @@ function qsAddBankRow(){
   row.id='row-'+id;
   row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px';
   row.innerHTML='<input type="text" id="'+id+'" placeholder="e.g. Union Bank of India" style="flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">'
+    +'<button id="sal-'+id+'" onclick="qsMarkSalary(\''+id+'\')" title="Mark as salary account" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:600;cursor:pointer;color:var(--tx3);flex-shrink:0;white-space:nowrap;font-family:inherit">💰 Salary?</button>'
     +'<button onclick="qsRemoveBankRow(\'row-'+id+'\')" style="background:none;border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;font-size:16px;cursor:pointer;color:var(--tx3);flex-shrink:0">×</button>';
   document.getElementById('qs-bank-list').appendChild(row);
+}
+function qsMarkSalary(id){
+  /* Deselect all salary buttons */
+  var list=document.getElementById('qs-bank-list');
+  Array.prototype.forEach.call(list.querySelectorAll('[id^="sal-"]'),function(btn){
+    btn.style.background='var(--sur2)';
+    btn.style.color='var(--tx3)';
+    btn.style.borderColor='var(--bdr)';
+    btn.textContent='💰 Salary?';
+    btn.dataset.selected='';
+  });
+  /* Mark selected */
+  var salBtn=document.getElementById('sal-'+id);
+  salBtn.style.background='var(--gbg)';
+  salBtn.style.color='var(--green)';
+  salBtn.style.borderColor='var(--green)';
+  salBtn.textContent='✓ Salary';
+  salBtn.dataset.selected='1';
 }
 function qsRemoveBankRow(rowId){
   var rows=document.getElementById('qs-bank-list').children;
@@ -1433,8 +1448,6 @@ function qsStep(n){
   if(n===2){
     var accs=_qsGetAccounts();
     if(!accs.length){showToast('Add at least one bank account','error');qsStep(1);return;}
-    var sel=document.getElementById('qs-sal-acc');
-    sel.innerHTML=accs.map(function(a,i){return '<option value="'+i+'">'+a.name+'</option>';}).join('');
   }
   if(n===3){
     var accs=_qsGetAccounts();
@@ -1452,24 +1465,32 @@ function _qsGetAccounts(){
   var list=document.getElementById('qs-bank-list');
   Array.prototype.forEach.call(list.querySelectorAll('input[type=text]'),function(inp){
     var name=inp.value.trim();
-    if(name)accs.push({name:name,type:'Bank Account'});
+    if(!name)return;
+    /* Check if salary button for this row is marked */
+    var rowId=inp.parentNode.id; /* row-qs-bank-N */
+    var bankId=inp.id; /* qs-bank-N */
+    var salBtn=document.getElementById('sal-'+bankId);
+    var isSalary=salBtn&&salBtn.dataset.selected==='1';
+    accs.push({name:name,type:'Bank Account',isSalary:isSalary});
   });
   var cash=document.getElementById('qs-cash').value.trim();
-  if(cash)accs.push({name:cash,type:'Cash'});
+  if(cash)accs.push({name:cash,type:'Cash',isSalary:false});
   return accs;
 }
 function applyQuickSetup(){
   var accs=_qsGetAccounts();
   if(!accs.length){showToast('Enter at least one account name','error');return;}
   var income=parseFloat(document.getElementById('qs-income').value)||0;
-  var salIdx=parseInt(document.getElementById('qs-sal-acc').value)||0;
   var salDay=parseInt(document.getElementById('qs-sal-day').value)||1;
   var newAccounts=accs.map(function(a,i){
     var actualBal=parseFloat(document.getElementById('qs-bal-'+i).value)||0;
     var id=Date.now().toString()+'_'+i;
-    return {id:id,name:a.name,type:a.type,openingBalance:actualBal,note:'',creditLimit:0,lowBalanceThreshold:0};
+    return {id:id,name:a.name,type:a.type,openingBalance:actualBal,note:'',creditLimit:0,lowBalanceThreshold:0,isSalaryAcc:a.isSalary};
   });
   D.accounts=newAccounts;
+  /* Find salary account */
+  var salAcc=newAccounts.find(function(a){return a.isSalaryAcc;});
+  if(!salAcc&&newAccounts.length)salAcc=newAccounts[0]; /* fallback to first */
   if(income>0){
     D.config.income=income;
     if(!D.config.salaryHistory)D.config.salaryHistory=[];
@@ -1477,7 +1498,7 @@ function applyQuickSetup(){
     D.config.salaryHistory=D.config.salaryHistory.filter(function(h){return h.from!==cm;});
     D.config.salaryHistory.push({amount:income,from:cm});
   }
-  D.config.salaryAccountId=newAccounts[salIdx]?newAccounts[salIdx].id:'';
+  D.config.salaryAccountId=salAcc?salAcc.id:'';
   D.config.salaryCreditDay=salDay;
   D.config.setupDone=true;
   autoSave();
