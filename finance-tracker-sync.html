@@ -1416,27 +1416,8 @@ function qsAddBankRow(){
   row.id='row-'+id;
   row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px';
   row.innerHTML='<input type="text" id="'+id+'" placeholder="e.g. Union Bank of India" style="flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">'
-    +'<button id="sal-'+id+'" onclick="qsMarkSalary(\''+id+'\')" title="Mark as salary account" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:600;cursor:pointer;color:var(--tx3);flex-shrink:0;white-space:nowrap;font-family:inherit">💰 Salary?</button>'
     +'<button onclick="qsRemoveBankRow(\'row-'+id+'\')" style="background:none;border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;font-size:16px;cursor:pointer;color:var(--tx3);flex-shrink:0">×</button>';
   document.getElementById('qs-bank-list').appendChild(row);
-}
-function qsMarkSalary(id){
-  /* Deselect all salary buttons */
-  var list=document.getElementById('qs-bank-list');
-  Array.prototype.forEach.call(list.querySelectorAll('[id^="sal-"]'),function(btn){
-    btn.style.background='var(--sur2)';
-    btn.style.color='var(--tx3)';
-    btn.style.borderColor='var(--bdr)';
-    btn.textContent='💰 Salary?';
-    btn.dataset.selected='';
-  });
-  /* Mark selected */
-  var salBtn=document.getElementById('sal-'+id);
-  salBtn.style.background='var(--gbg)';
-  salBtn.style.color='var(--green)';
-  salBtn.style.borderColor='var(--green)';
-  salBtn.textContent='✓ Salary';
-  salBtn.dataset.selected='1';
 }
 function qsRemoveBankRow(rowId){
   var rows=document.getElementById('qs-bank-list').children;
@@ -1471,16 +1452,10 @@ function _qsGetAccounts(){
   var list=document.getElementById('qs-bank-list');
   Array.prototype.forEach.call(list.querySelectorAll('input[type=text]'),function(inp){
     var name=inp.value.trim();
-    if(!name)return;
-    /* Check if salary button for this row is marked */
-    var rowId=inp.parentNode.id; /* row-qs-bank-N */
-    var bankId=inp.id; /* qs-bank-N */
-    var salBtn=document.getElementById('sal-'+bankId);
-    var isSalary=salBtn&&salBtn.dataset.selected==='1';
-    accs.push({name:name,type:'Bank Account',isSalary:isSalary});
+    if(name)accs.push({name:name,type:'Bank Account'});
   });
   var cash=document.getElementById('qs-cash').value.trim();
-  if(cash)accs.push({name:cash,type:'Cash',isSalary:false});
+  if(cash)accs.push({name:cash,type:'Cash'});
   return accs;
 }
 function applyQuickSetup(){
