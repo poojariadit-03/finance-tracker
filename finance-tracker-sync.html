@@ -2168,9 +2168,15 @@ function checkReminders(){var _ckm=mk();var pending=D.fixed.filter(function(f){r
 /* ═══ CALENDAR ═══ */
 function renderCalendar(){
   var exps=getExpenses(),year=curDate.getFullYear(),month=curDate.getMonth(),today=new Date();
-  var dayT={};exps.forEach(function(e){var d=new Date(e.date).getDate();dayT[d]=(dayT[d]||0)+e.amt;});
-  /* Also track income per day */
-  var dayInc={};getExtraIncome().forEach(function(e){var d=new Date(e.date).getDate();dayInc[d]=(dayInc[d]||0)+e.amt;});
+  /* Use date string slice to avoid timezone issues */
+  var dayT={};exps.forEach(function(e){
+    var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
+    dayT[day]=(dayT[day]||0)+e.amt;
+  });
+  var dayInc={};getExtraIncome().forEach(function(e){
+    var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
+    dayInc[day]=(dayInc[day]||0)+e.amt;
+  });
   var maxA=Math.max.apply(null,Object.values(dayT).concat([1])),firstDay=new Date(year,month,1).getDay(),dim=new Date(year,month+1,0).getDate(),prev=new Date(year,month,0).getDate();
   var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var h=days.map(function(d){return '<div class="calhd">'+d+'</div>';}).join('');
@@ -2180,7 +2186,22 @@ function renderCalendar(){
   document.getElementById('calGrid').innerHTML=h;if(selDay)showDayPanel(selDay);
 }
 function selectDay(d){selDay=selDay===d?null:d;renderCalendar();if(!selDay)document.getElementById('dayPanel').style.display='none';}
-function showDayPanel(d){var exps=getExpenses().filter(function(e){return new Date(e.date).getDate()===d;}),panel=document.getElementById('dayPanel');var ds=new Date(curDate.getFullYear(),curDate.getMonth(),d).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});if(!exps.length){panel.innerHTML='<div style="font-size:13px;color:var(--tx3)">'+ds+' — no expenses.</div>';}else{var total=exps.reduce(function(s,e){return s+e.amt;},0);panel.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-size:13px;font-weight:500">'+ds+'</span><span style="font-family:\'DM Mono\',monospace;font-size:13px">'+fmt(total)+'</span></div>'+exps.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+(getCatColor(e.cat))+'"></div><span class="ename">'+e.name+'</span><span class="emeta">'+e.cat+'</span></div><span class="eamt">'+fmt(e.amt)+'</span></div>';}).join('');}panel.style.display='block';}
+function showDayPanel(d){
+  var exps=getExpenses().filter(function(e){
+    var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
+    return day===d;
+  });
+  var panel=document.getElementById('dayPanel');
+  var ds=new Date(curDate.getFullYear(),curDate.getMonth(),d).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
+  if(!exps.length){
+    panel.innerHTML='<div style="font-size:13px;color:var(--tx3)">'+ds+' — no expenses.</div>';
+  } else {
+    var total=exps.reduce(function(s,e){return s+e.amt;},0);
+    panel.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-size:13px;font-weight:500">'+ds+'</span><span style="font-family:\'DM Mono\',monospace;font-size:13px">'+fmt(total)+'</span></div>'+
+      exps.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+(getCatColor(e.cat))+'"></div><span class="ename">'+e.name+'</span><span class="emeta">'+e.cat+'</span></div><span class="eamt">'+fmt(e.amt)+'</span></div>';}).join('');
+  }
+  panel.style.display='block';
+}
 
 /* ═══ HISTORY ═══ */
 function renderHistory(){
