@@ -816,14 +816,28 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
 <div class="modal-ov" id="monthResetModal"><div class="modal-box"><div class="modal-hd"><span class="modal-title">🗓️ New Month!</span><button class="modal-cls" onclick="closeMonthReset()">×</button></div><div id="monthResetBody"></div><div style="margin-top:16px;display:flex;gap:10px"><button class="btn" style="flex:1" onclick="closeMonthReset()">Let's go! 🚀</button><button class="btn-ghost" onclick="closeMonthReset()">Dismiss</button></div></div></div>
 <div class="modal-ov" id="autoContribModal"><div class="modal-box"><div class="modal-hd"><span class="modal-title">⚙️ Auto-contribution</span><button class="modal-cls" onclick="document.getElementById('autoContribModal').classList.remove('show')">×</button></div><p style="font-size:13px;color:var(--tx2);margin-bottom:14px">Set a fixed monthly amount to auto-add to this goal.</p><div id="autoContribGoalName" style="font-size:15px;font-weight:600;margin-bottom:14px"></div><div class="irow"><input type="number" id="autoContribAmt" placeholder="Monthly ₹" min="0" style="flex:1"><input type="number" id="autoContribDay" placeholder="Day of month e.g. 5" min="1" max="28" style="max-width:155px"></div><div style="font-size:12px;color:var(--tx3);margin-bottom:14px">Enter 0 to disable.</div><button class="btn" style="width:100%" onclick="saveAutoContrib()">Save</button></div></div>
 <div class="modal-ov" id="exportModal">
-  <div class="modal-box" style="max-width:360px">
+  <div class="modal-box" style="max-width:380px">
     <div class="modal-hd"><span class="modal-title" id="exportModalTitle">Export</span><button class="modal-cls" onclick="document.getElementById('exportModal').classList.remove('show')">×</button></div>
-    <p style="font-size:13px;color:var(--tx2);margin-bottom:16px">Select the time period to include:</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <button class="btn" style="background:var(--sur2);color:var(--tx);border:1px solid var(--bdr)" onclick="doExport(1)">📅 This Month</button>
-      <button class="btn" style="background:var(--sur2);color:var(--tx);border:1px solid var(--bdr)" onclick="doExport(3)">📅 3 Months</button>
-      <button class="btn" style="background:var(--sur2);color:var(--tx);border:1px solid var(--bdr)" onclick="doExport(6)">📅 6 Months</button>
-      <button class="btn" style="background:var(--sur2);color:var(--tx);border:1px solid var(--bdr)" onclick="doExport(12)">📅 1 Year</button>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:14px">Choose a date range:</p>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:600;color:var(--tx3);margin-bottom:5px;text-transform:uppercase">From</div>
+        <input type="month" id="exportFromMonth" style="width:100%" onchange="updateExportHint()">
+      </div>
+      <div style="font-size:16px;color:var(--tx3);margin-top:16px">→</div>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:600;color:var(--tx3);margin-bottom:5px;text-transform:uppercase">To</div>
+        <input type="month" id="exportToMonth" style="width:100%" onchange="updateExportHint()">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--tx3);margin-bottom:14px" id="exportRangeHint"></div>
+    <button class="btn" style="width:100%;margin-bottom:10px;background:var(--green)" onclick="doExportRange()">Generate →</button>
+    <div style="font-size:11px;font-weight:600;color:var(--tx3);margin-bottom:8px;text-transform:uppercase">Quick select</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn-ghost" onclick="setExportRange(1)">This month</button>
+      <button class="btn-ghost" onclick="setExportRange(3)">Last 3 months</button>
+      <button class="btn-ghost" onclick="setExportRange(6)">Last 6 months</button>
+      <button class="btn-ghost" onclick="setExportRange(12)">Last 1 year</button>
     </div>
   </div>
 </div>
@@ -2454,7 +2468,44 @@ var exportType='excel';
 function openExportModal(type){
   exportType=type;
   document.getElementById('exportModalTitle').textContent=type==='excel'?'⬇ Excel Export':'📊 Chart Report';
+  /* Pre-fill: from = current month, to = current month */
+  var cm=curDate.getFullYear()+'-'+String(curDate.getMonth()+1).padStart(2,'0');
+  document.getElementById('exportFromMonth').value=cm;
+  document.getElementById('exportToMonth').value=cm;
+  updateExportHint();
   document.getElementById('exportModal').classList.add('show');
+}
+function updateExportHint(){
+  var from=document.getElementById('exportFromMonth').value;
+  var to=document.getElementById('exportToMonth').value;
+  var hint=document.getElementById('exportRangeHint');
+  if(!from||!to){hint.textContent='';return;}
+  var fp=from.split('-'),tp=to.split('-');
+  var fromD=new Date(parseInt(fp[0]),parseInt(fp[1])-1,1);
+  var toD=new Date(parseInt(tp[0]),parseInt(tp[1])-1,1);
+  if(fromD>toD){hint.textContent='⚠️ From must be before To';hint.style.color='var(--red)';return;}
+  var months=(toD.getFullYear()-fromD.getFullYear())*12+(toD.getMonth()-fromD.getMonth())+1;
+  hint.textContent=months+' month'+(months>1?'s':'')+' selected';
+  hint.style.color='var(--green)';
+}
+function setExportRange(n){
+  var to=new Date(curDate.getFullYear(),curDate.getMonth(),1);
+  var from=new Date(curDate.getFullYear(),curDate.getMonth()-(n-1),1);
+  document.getElementById('exportFromMonth').value=from.getFullYear()+'-'+String(from.getMonth()+1).padStart(2,'0');
+  document.getElementById('exportToMonth').value=to.getFullYear()+'-'+String(to.getMonth()+1).padStart(2,'0');
+  updateExportHint();
+}
+function doExportRange(){
+  var from=document.getElementById('exportFromMonth').value;
+  var to=document.getElementById('exportToMonth').value;
+  if(!from||!to){showToast('Select from and to months','error');return;}
+  var fp=from.split('-'),tp=to.split('-');
+  var fromD=new Date(parseInt(fp[0]),parseInt(fp[1])-1,1);
+  var toD=new Date(parseInt(tp[0]),parseInt(tp[1])-1,1);
+  if(fromD>toD){showToast('From must be before To','error');return;}
+  document.getElementById('exportModal').classList.remove('show');
+  if(exportType==='excel')exportExcelRange(fromD,toD);
+  else exportReportRange(fromD,toD);
 }
 function doExport(months){
   document.getElementById('exportModal').classList.remove('show');
@@ -2668,6 +2719,71 @@ function exportExcel(months){
   XLSX.writeFile(wb,'finance-tracker-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
+function exportExcelRange(fromD,toD){
+  /* Build list of months in range */
+  var months=[];
+  var cur=new Date(fromD.getFullYear(),fromD.getMonth(),1);
+  while(cur<=toD){months.push(new Date(cur));cur.setMonth(cur.getMonth()+1);}
+  if(!months.length)return;
+  if(typeof XLSX==='undefined'){showToast('Excel library not loaded','error');return;}
+  var wb=XLSX.utils.book_new(),accs=D.accounts,fxd=fixedMonthly();
+  /* Sheet 1: Monthly Summary */
+  var sum=[['Month','Income','Fixed Costs','Daily Spent','Total Expenses','Savings','Balance']];
+  months.forEach(function(d){
+    var mI=(D.config.income||0)+extraIncomeTotal(d);
+    var s=getExpenses(d).reduce(function(a,e){return a+e.amt;},0);
+    var sav=Math.max(0,mI-fxd-s),bal=mI-fxd-s;
+    sum.push([d.toLocaleString('default',{month:'long',year:'numeric'}),mI,Math.round(fxd),Math.round(s),Math.round(fxd+s),Math.round(sav),Math.round(bal)]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sum),'Monthly Summary');
+  /* Sheet 2: All Expenses in range */
+  var all=[['Month','Date','Description','Category','Account','Amount (₹)','Note']];
+  var mKeys=months.map(function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');});
+  var rangeExps=D.expenses.filter(function(e){return mKeys.indexOf(e.month)>-1;});
+  rangeExps.sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+  rangeExps.forEach(function(e){
+    var acc=accs.find(function(a){return a.id===e.accountId;});
+    var p=e.month.split('-'),d=new Date(parseInt(p[0]),parseInt(p[1])-1,1);
+    all.push([d.toLocaleString('default',{month:'long',year:'numeric'}),new Date(e.date).toLocaleDateString('en-IN'),e.name,e.cat,acc?acc.name:'',e.amt,e.note||'']);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(all),'All Expenses');
+  /* Sheet 3: Extra Income in range */
+  var xi=[['Month','Date','Description','Source','Amount (₹)']];
+  (D.extraIncome||[]).filter(function(e){return mKeys.indexOf(e.month)>-1;}).forEach(function(e){
+    xi.push([e.month,new Date(e.date).toLocaleDateString('en-IN'),e.name,e.source,e.amt]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(xi),'Extra Income');
+  var label=fromD.toLocaleString('default',{month:'short',year:'numeric'})+'-to-'+toD.toLocaleString('default',{month:'short',year:'numeric'});
+  XLSX.writeFile(wb,'finance-'+label+'.xlsx');
+  showToast('Excel exported!','success');
+}
+function exportReportRange(fromD,toD){
+  /* Build months list */
+  var months=[];
+  var cur=new Date(fromD.getFullYear(),fromD.getMonth(),1);
+  while(cur<=toD){months.push(new Date(cur));cur.setMonth(cur.getMonth()+1);}
+  var fxd=fixedMonthly();
+  var hist=months.map(function(d){
+    var s=getExpenses(d).reduce(function(a,e){return a+e.amt;},0),mI=(D.config.income||0)+extraIncomeTotal(d);
+    return{label:d.toLocaleString('default',{month:'short',year:'numeric'}),income:mI,fxd:Math.round(fxd),spent:Math.round(s),savings:Math.round(Math.max(0,mI-fxd-s)),balance:Math.round(mI-fxd-s)};
+  });
+  var mKeys=months.map(function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');});
+  var allExps=D.expenses.filter(function(e){return mKeys.indexOf(e.month)>-1;});
+  var totalSpent=allExps.reduce(function(s,e){return s+e.amt;},0);
+  var cats={};allExps.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
+  var cL=Object.keys(cats),cD=cL.map(function(k){return Math.round(cats[k]);});
+  var CC2={Food:'#1D9E75',Transport:'#378ADD',Shopping:'#D4537E',Health:'#7F77DD',Entertainment:'#EF9F27',Utilities:'#3B6D11',Education:'#534AB7',Other:'#888780'};
+  var cC=cL.map(function(k){return CC2[k]||'#888';});
+  var mStr=fromD.toLocaleString('default',{month:'long',year:'numeric'})+' — '+toD.toLocaleString('default',{month:'long',year:'numeric'});
+  var r=function(n){return '₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');};
+  var hRows=hist.map(function(h){return '<tr><td>'+h.label+'</td><td>'+r(h.income)+'</td><td>'+r(h.fxd)+'</td><td>'+r(h.spent)+'</td><td style="color:#1D9E75">'+r(h.savings)+'</td><td style="color:'+(h.balance>=0?'#1D9E75':'#D85A30')+'">'+r(h.balance)+'</td></tr>';}).join('');
+  var sD='var H='+JSON.stringify(hist)+';var CL='+JSON.stringify(cL)+';var CD='+JSON.stringify(cD)+';var CC2='+JSON.stringify(cC)+';';
+  var sC='try{if(H.length>1)new Chart(document.getElementById("hc"),{type:"bar",data:{labels:H.map(function(d){return d.label;}),datasets:[{data:H.map(function(d){return d.income;}),backgroundColor:"#378ADD",borderRadius:4},{data:H.map(function(d){return d.fxd+d.spent;}),backgroundColor:"#D85A30",borderRadius:4},{data:H.map(function(d){return d.savings;}),backgroundColor:"#1D9E75",borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{ticks:{callback:function(v){return"₹"+(v>=100000?(v/100000).toFixed(0)+"L":v>=1000?(v/1000).toFixed(0)+"K":v);}}}}}});if(CL.length)new Chart(document.getElementById("cc"),{type:"doughnut",data:{labels:CL,datasets:[{data:CD,backgroundColor:CC2,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:"62%",plugins:{legend:{display:false}}}});}catch(e){}';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report '+mStr+'</title><scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></scr'+'ipt><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#F7F6F3;color:#1A1A18;font-size:15px}.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem}h1{font-size:24px;font-weight:700;margin-bottom:4px}.sub{color:#6B6A65;font-size:14px;margin-bottom:2rem}.sec{margin-bottom:2rem}.stitle{font-size:11px;font-weight:600;text-transform:uppercase;color:#9E9C97;margin-bottom:10px}.card{background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:1.25rem 1.5rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}.ch{position:relative;height:200px}table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:10px;font-weight:600;text-transform:uppercase;color:#9E9C97;text-align:left;padding:6px 8px;border-bottom:1px solid #E4E2DA}td{padding:8px;border-bottom:1px solid #E4E2DA;font-family:monospace}td:first-child{font-family:inherit;color:#6B6A65}.pbtn{position:fixed;bottom:24px;right:24px;background:#1A1A18;color:#fff;border:none;border-radius:99px;padding:12px 24px;font-size:14px;cursor:pointer}@media print{.pbtn{display:none}}</style></head><body><div class="page"><h1>💰 Finance Report</h1><div class="sub">'+mStr+'</div><div class="sec"><div class="stitle">Overview</div><div class="card"><div class="ch"><canvas id="hc"></canvas></div></div></div><div class="two"><div class="card"><div class="stitle">By Category</div><div class="ch"><canvas id="cc"></canvas></div></div></div><div class="sec"><div class="stitle">Monthly Summary</div><div class="card"><table><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div></div><button class="pbtn" onclick="window.print()">🖨 Print PDF</button><scr'+'ipt>'+sD+sC+'<\/script></body></html>';
+  var label=fromD.toLocaleString('default',{month:'short',year:'numeric'})+'-to-'+toD.toLocaleString('default',{month:'short',year:'numeric'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download='report-'+label+'.html';a.click();
+  showToast('Report downloaded!','success');
+}
 function exportCSV(){
   var arr;
   if(typeof _rangeFrom!=='undefined'&&(_rangeFrom||_rangeTo)){
