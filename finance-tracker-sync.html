@@ -2921,7 +2921,7 @@ function renderExtraIncome(){
   if(eEl)eEl.textContent=total>0?'+'+fmt(total)+(ytd>total?' (YTD +'+fmt(ytd)+')':''):'';
   var srcIco={};INC_SOURCES.forEach(function(s){srcIco[s.key]=s.icon;});
   document.getElementById('extraIncList').innerHTML=entries.length
-    ?entries.slice().reverse().map(function(e){
+    ?entries.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(e){
         var d=new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
         return '<div class="erow"><div class="eleft"><div style="font-size:16px;margin-right:6px">'+(srcIco[e.source]||'💰')+'</div>'
           +'<div><div class="ename">'+e.name+'</div><div class="emeta">'+d+' · '+e.source+'</div></div></div>'
