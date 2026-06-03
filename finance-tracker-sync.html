@@ -628,7 +628,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <button class="hist-pill" onclick="setHistRange(9,this)">9 Months</button>
     <button class="hist-pill" onclick="setHistRange(12,this)">12 Months</button>
   </div>
-  <div class="card"><div class="card-hd"><span class="ctitle">6-month comparison</span></div><div style="position:relative;height:220px"><canvas id="histChart"></canvas></div><div class="legwrap" id="histLeg"></div></div>
+  <div class="card"><div class="card-hd"><span class="ctitle" id="histChartTitle">6-month comparison</span></div><div style="position:relative;height:220px"><canvas id="histChart"></canvas></div><div class="legwrap" id="histLeg"></div></div>
   <div class="card"><div class="card-hd"><span class="ctitle">Monthly summary</span></div><div style="overflow-x:auto"><table class="htable"><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody id="histBody"></tbody></table></div></div>
   <hr style="border:none;border-top:1px solid var(--bdr);margin:1rem 0">
   <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
@@ -3711,6 +3711,13 @@ function syncSavPill(val){
 function setHistRange(val,btn){
   document.querySelectorAll('.hist-pill').forEach(function(p){p.classList.remove('active');});
   if(btn)btn.classList.add('active');
+  /* Update chart title */
+  var titleEl=document.getElementById('histChartTitle');
+  if(titleEl){
+    if(val===15)titleEl.textContent='Last 15 days';
+    else if(val===30)titleEl.textContent='Last 30 days';
+    else titleEl.textContent=val+'-month comparison';
+  }
   if(val<=30){
     _histRangeDays=val;
     _histRangeMonths=0;
