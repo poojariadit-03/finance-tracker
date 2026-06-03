@@ -3048,7 +3048,7 @@ function checkAutoContribs(){
 }
 /* -- THEME & FONT -- */
 /* ═══ INCOME PASSWORD PROTECTION ═══ */
-var _incomeUnlocked=false;
+var _incomeUnlocked=sessionStorage.getItem('ft_income_unlocked')==='1';
 
 function simpleHash(str){
   /* Simple hash — not cryptographic but good enough for this use case */
@@ -3070,6 +3070,7 @@ function toggleIncomeLock(){
   if(_incomeUnlocked){
     /* Lock it */
     _incomeUnlocked=false;
+    sessionStorage.removeItem('ft_income_unlocked');
     applyIncomeLock();
     showToast('Income data locked 🔒','info');
   } else {
@@ -3093,6 +3094,7 @@ function verifyIncomePassword(){
   var hash=simpleHash(input);
   if(hash===D.config.incomePasswordHash){
     _incomeUnlocked=true;
+    sessionStorage.setItem('ft_income_unlocked','1');
     document.getElementById('incomeUnlockModal').classList.remove('show');
     applyIncomeLock();
     showToast('Income data unlocked 🔓','success');
@@ -3133,7 +3135,7 @@ function saveIncomePassword(){
   D.config.incomePasswordHash=simpleHash(newPass);
   D.config.incomePasswordHint=document.getElementById('passwordHintInput').value.trim();
   autoSave();
-  _incomeUnlocked=true; /* unlock after setting */
+  _incomeUnlocked=true;sessionStorage.setItem('ft_income_unlocked','1'); /* unlock after setting */
   document.getElementById('incomeSetPasswordModal').classList.remove('show');
   applyIncomeLock();
   showToast(hasPass?'Password changed ✓':'Income password set ✓','success');
