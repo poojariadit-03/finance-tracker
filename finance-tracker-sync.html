@@ -763,19 +763,15 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <p style="font-size:13px;color:var(--tx2);margin-bottom:18px;line-height:1.6">Let's set up your accounts properly so balances are always accurate. Takes 1 minute.</p>
     <!-- Step 1: Bank -->
     <div id="qs-step1">
-      <div style="font-size:13px;font-weight:600;margin-bottom:10px">Step 1 of 3 — Your accounts</div>
-      <div style="font-size:12px;color:var(--tx3);margin-bottom:16px">Just type the names of the accounts you use. Leave blank if you don't use it.</div>
-      <div style="margin-bottom:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">🏦 Bank name (e.g. HDFC, SBI, Kotak)</div>
-        <input type="text" id="qs-bank1" placeholder="e.g. HDFC" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">
-      </div>
-      <div style="margin-bottom:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">📱 UPI app (e.g. PhonePe, GPay, Paytm) — optional</div>
-        <input type="text" id="qs-upi" placeholder="e.g. PhonePe" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">
-      </div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Step 1 of 3 — Your bank accounts</div>
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:14px">Add all your bank accounts. You can add as many as you want.</div>
+      <div id="qs-bank-list"></div>
+      <button class="btn-ghost" style="width:100%;margin-bottom:16px;padding:10px" onclick="qsAddBankRow()">+ Add bank account</button>
       <div style="margin-bottom:20px">
-        <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">💵 Cash (physical cash you carry) — optional</div>
-        <input type="text" id="qs-cash" placeholder="e.g. Wallet" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">
+        <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">💵 Do you carry physical cash?</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="text" id="qs-cash" placeholder="Cash / Wallet (leave blank if no)" style="flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">
+        </div>
       </div>
       <button class="btn" style="width:100%" onclick="qsStep(2)">Next →</button>
     </div>
@@ -1404,36 +1400,61 @@ function closeRecal(){document.getElementById('recalModal').classList.remove('sh
 
 /* ═══ QUICK SETUP ═══ */
 var _qsAccounts=[];
+var _qsBankCount=0;
 function startQuickSetup(){
+  _qsBankCount=0;
+  document.getElementById('qs-bank-list').innerHTML='';
+  document.getElementById('qs-cash').value='';
+  /* Add one row by default */
+  qsAddBankRow();
   document.getElementById('quickSetupModal').classList.add('show');
   qsStep(1);
+}
+function qsAddBankRow(){
+  var id='qs-bank-'+(_qsBankCount++);
+  var row=document.createElement('div');
+  row.id='row-'+id;
+  row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px';
+  row.innerHTML='<input type="text" id="'+id+'" placeholder="e.g. Union Bank of India" style="flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">'
+    +'<button onclick="qsRemoveBankRow(\'row-'+id+'\')" style="background:none;border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;font-size:16px;cursor:pointer;color:var(--tx3);flex-shrink:0">×</button>';
+  document.getElementById('qs-bank-list').appendChild(row);
+}
+function qsRemoveBankRow(rowId){
+  var rows=document.getElementById('qs-bank-list').children;
+  if(rows.length<=1){showToast('At least one bank account is required','error');return;}
+  var row=document.getElementById(rowId);
+  var inp=row.querySelector('input');
+  var name=inp&&inp.value.trim()?inp.value.trim():'this account';
+  if(!confirm('Remove "'+name+'"?'))return;
+  row.parentNode.removeChild(row);
 }
 function qsStep(n){
   [1,2,3].forEach(function(i){document.getElementById('qs-step'+i).style.display=i===n?'block':'none';});
   if(n===2){
-    /* populate salary account dropdown from step 1 inputs */
     var accs=_qsGetAccounts();
+    if(!accs.length){showToast('Add at least one bank account','error');qsStep(1);return;}
     var sel=document.getElementById('qs-sal-acc');
     sel.innerHTML=accs.map(function(a,i){return '<option value="'+i+'">'+a.name+'</option>';}).join('');
   }
   if(n===3){
     var accs=_qsGetAccounts();
-    var html=accs.map(function(a,i){
+    if(!accs.length){showToast('Add at least one bank account','error');qsStep(1);return;}
+    document.getElementById('qs-bal-fields').innerHTML=accs.map(function(a,i){
       return '<div style="margin-bottom:10px;padding:10px 12px;background:var(--sur2);border-radius:10px">'
-        +'<div style="font-size:13px;font-weight:600;margin-bottom:7px">'+a.name+'</div>'
-        +'<input type="number" id="qs-bal-'+i+'" placeholder="Current balance ₹ (can be 0)" style="width:100%;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">'
+        +'<div style="font-size:13px;font-weight:600;margin-bottom:7px">🏦 '+a.name+'</div>'
+        +'<input type="number" id="qs-bal-'+i+'" placeholder="Current balance ₹ (enter 0 if unsure)" style="width:100%;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">'
         +'</div>';
     }).join('');
-    document.getElementById('qs-bal-fields').innerHTML=html||'<p class="empty">Enter account names in Step 1 first.</p>';
   }
 }
 function _qsGetAccounts(){
   var accs=[];
-  var b1=document.getElementById('qs-bank1').value.trim();
-  var upi=document.getElementById('qs-upi').value.trim();
+  var list=document.getElementById('qs-bank-list');
+  Array.prototype.forEach.call(list.querySelectorAll('input[type=text]'),function(inp){
+    var name=inp.value.trim();
+    if(name)accs.push({name:name,type:'Bank Account'});
+  });
   var cash=document.getElementById('qs-cash').value.trim();
-  if(b1)accs.push({name:b1,type:'Bank Account'});
-  if(upi)accs.push({name:upi,type:'UPI'});
   if(cash)accs.push({name:cash,type:'Cash'});
   return accs;
 }
@@ -1443,16 +1464,19 @@ function applyQuickSetup(){
   var income=parseFloat(document.getElementById('qs-income').value)||0;
   var salIdx=parseInt(document.getElementById('qs-sal-acc').value)||0;
   var salDay=parseInt(document.getElementById('qs-sal-day').value)||1;
-  /* Create new accounts, replacing defaults */
   var newAccounts=accs.map(function(a,i){
     var actualBal=parseFloat(document.getElementById('qs-bal-'+i).value)||0;
     var id=Date.now().toString()+'_'+i;
     return {id:id,name:a.name,type:a.type,openingBalance:actualBal,note:'',creditLimit:0,lowBalanceThreshold:0};
   });
-  /* Remove default accounts, add new ones */
   D.accounts=newAccounts;
-  /* Set income and salary config */
-  if(income>0)D.config.income=income;
+  if(income>0){
+    D.config.income=income;
+    if(!D.config.salaryHistory)D.config.salaryHistory=[];
+    var cm=mk();
+    D.config.salaryHistory=D.config.salaryHistory.filter(function(h){return h.from!==cm;});
+    D.config.salaryHistory.push({amount:income,from:cm});
+  }
   D.config.salaryAccountId=newAccounts[salIdx]?newAccounts[salIdx].id:'';
   D.config.salaryCreditDay=salDay;
   D.config.setupDone=true;
