@@ -446,13 +446,6 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     </div>
     <div id="extraIncList"><p class="empty">No extra income this month. Click + Add to log some!</p></div>
   </div>
-  <div class="card">
-    <div class="card-hd">
-      <span class="ctitle">📈 Salary history</span>
-      <span style="font-size:12px;color:var(--tx3)">Auto-tracked when you change income</span>
-    </div>
-    <div id="salaryHistoryList"><p class="empty">No salary changes recorded yet.</p></div>
-  </div>
 </div>
 <div class="tab-content" id="tab-accounts">
   <div class="card" style="margin-bottom:12px">
@@ -3761,7 +3754,7 @@ function renderAll(){
   var salDay=document.getElementById('salaryCreditDay');if(salDay&&D.config.salaryCreditDay)salDay.value=D.config.salaryCreditDay;
   renderAccounts();populateAccSel();populateTransferSelects();
   if(document.getElementById('fixedSummary'))renderFixedSummary();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();autoLogFixed();
-  renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();renderSalaryHistory();populateLentAccSel();
+  renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();populateLentAccSel();
   applyTheme(D.config.theme||'auto');applyFontSize(D.config.fontSize||'normal');updateLentBadge();renderLent();
   var incDt=document.getElementById('incDate');if(incDt)incDt.value=todayStr();
   if(D.config&&D.config.dailyLimit){var dli=document.getElementById('dailyLimitInput');if(dli)dli.value=D.config.dailyLimit;}
