@@ -360,7 +360,9 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <button class="btn" style="background:var(--green)" onclick="openExportModal('excel')">⬇ Excel</button>
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
     <button class="theme-btn" id="fontBtn" onclick="cycleFontSize()">A</button>
+    <button class="theme-btn" id="incomeLockBtn" onclick="toggleIncomeLock()" title="Lock/Unlock income">🔒</button>
     <button class="btn-ghost" onclick="disconnectFirebase()">⚙️ Setup</button>
+    <button class="btn-ghost" onclick="openSetPassword()">🔑 Password</button>
   </div>
 </header>
 <div class="banner banner-red" id="spendBanner" style="display:none">
@@ -797,6 +799,36 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
         <button class="btn" style="flex:1;background:var(--green)" onclick="applyQuickSetup()">✓ All done!</button>
       </div>
     </div>
+  </div>
+</div>
+<!-- INCOME PASSWORD MODALS -->
+<div class="modal-ov" id="incomeUnlockModal">
+  <div class="modal-box" style="max-width:340px;text-align:center">
+    <div class="modal-hd"><span class="modal-title">🔒 Enter Password</span><button class="modal-cls" onclick="document.getElementById('incomeUnlockModal').classList.remove('show')">×</button></div>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:16px">Enter your income password to view sensitive data.</p>
+    <input type="password" id="unlockPasswordInput" placeholder="Enter password" style="width:100%;margin-bottom:12px;text-align:center;font-size:18px;letter-spacing:4px" onkeydown="if(event.key==='Enter')verifyIncomePassword()">
+    <div id="unlockError" style="font-size:12px;color:var(--red);margin-bottom:10px;display:none">Wrong password. Try again.</div>
+    <button class="btn" style="width:100%;background:var(--green)" onclick="verifyIncomePassword()">Unlock →</button>
+  </div>
+</div>
+<div class="modal-ov" id="incomeSetPasswordModal">
+  <div class="modal-box" style="max-width:340px">
+    <div class="modal-hd"><span class="modal-title" id="setPwdTitle">🔐 Set Income Password</span><button class="modal-cls" onclick="document.getElementById('incomeSetPasswordModal').classList.remove('show')">×</button></div>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:16px" id="setPwdDesc">Set a password to protect your income and balance data.</p>
+    <div id="oldPwdRow" style="display:none;margin-bottom:10px">
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:5px">Current password</div>
+      <input type="password" id="oldPasswordInput" placeholder="Current password" style="width:100%">
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:5px">New password</div>
+      <input type="password" id="newPasswordInput" placeholder="New password" style="width:100%">
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:5px">Confirm password</div>
+      <input type="password" id="confirmPasswordInput" placeholder="Confirm password" style="width:100%">
+    </div>
+    <div id="setPwdError" style="font-size:12px;color:var(--red);margin-bottom:10px;display:none"></div>
+    <button class="btn" style="width:100%;background:var(--green)" onclick="saveIncomePassword()">Save Password</button>
   </div>
 </div>
 <!-- LENT ACTION MODAL -->
@@ -1278,7 +1310,8 @@ function recalc(){
   renderHealthScore();
   renderMonthlySummary();
   if(document.getElementById('nwSnapshotBody'))renderNWSnapshot();
-  var ecb=document.getElementById('expCountBadge');if(ecb){var ec=getExpenses().length;ecb.textContent=ec>0?'('+ec+')':'';}  
+  var ecb=document.getElementById('expCountBadge');if(ecb){var ec=getExpenses().length;ecb.textContent=ec>0?'('+ec+')':'';}
+  applyIncomeLock();
 }
 
 /* ═══ MONTHLY SUMMARY ═══ */
@@ -3007,6 +3040,110 @@ function checkAutoContribs(){
   });
 }
 /* -- THEME & FONT -- */
+/* ═══ INCOME PASSWORD PROTECTION ═══ */
+var _incomeUnlocked=false;
+
+function simpleHash(str){
+  /* Simple hash — not cryptographic but good enough for this use case */
+  var hash=0;
+  for(var i=0;i<str.length;i++){hash=((hash<<5)-hash)+str.charCodeAt(i);hash=hash&hash;}
+  return Math.abs(hash).toString(16);
+}
+
+function hasIncomePassword(){
+  return !!(D.config.incomePasswordHash);
+}
+
+function toggleIncomeLock(){
+  if(!hasIncomePassword()){
+    /* No password set yet — open set password modal */
+    openSetPassword();
+    return;
+  }
+  if(_incomeUnlocked){
+    /* Lock it */
+    _incomeUnlocked=false;
+    applyIncomeLock();
+    showToast('Income data locked 🔒','info');
+  } else {
+    /* Unlock — show password modal */
+    document.getElementById('unlockPasswordInput').value='';
+    document.getElementById('unlockError').style.display='none';
+    document.getElementById('incomeUnlockModal').classList.add('show');
+    setTimeout(function(){document.getElementById('unlockPasswordInput').focus();},300);
+  }
+}
+
+function verifyIncomePassword(){
+  var input=document.getElementById('unlockPasswordInput').value;
+  if(!input){showToast('Enter password','error');return;}
+  var hash=simpleHash(input);
+  if(hash===D.config.incomePasswordHash){
+    _incomeUnlocked=true;
+    document.getElementById('incomeUnlockModal').classList.remove('show');
+    applyIncomeLock();
+    showToast('Income data unlocked 🔓','success');
+  } else {
+    document.getElementById('unlockError').style.display='block';
+    document.getElementById('unlockPasswordInput').value='';
+    document.getElementById('unlockPasswordInput').focus();
+  }
+}
+
+function openSetPassword(){
+  var hasPass=hasIncomePassword();
+  document.getElementById('setPwdTitle').textContent=hasPass?'🔑 Change Password':'🔐 Set Income Password';
+  document.getElementById('setPwdDesc').textContent=hasPass?'Enter your current password then set a new one.':'Set a password to protect your income and balance.';
+  document.getElementById('oldPwdRow').style.display=hasPass?'block':'none';
+  document.getElementById('oldPasswordInput').value='';
+  document.getElementById('newPasswordInput').value='';
+  document.getElementById('confirmPasswordInput').value='';
+  document.getElementById('setPwdError').style.display='none';
+  document.getElementById('incomeSetPasswordModal').classList.add('show');
+}
+
+function saveIncomePassword(){
+  var errEl=document.getElementById('setPwdError');
+  errEl.style.display='none';
+  var hasPass=hasIncomePassword();
+  /* Verify old password if changing */
+  if(hasPass){
+    var oldInput=document.getElementById('oldPasswordInput').value;
+    if(!oldInput){errEl.textContent='Enter current password';errEl.style.display='block';return;}
+    if(simpleHash(oldInput)!==D.config.incomePasswordHash){errEl.textContent='Current password is wrong';errEl.style.display='block';return;}
+  }
+  var newPass=document.getElementById('newPasswordInput').value;
+  var confirmPass=document.getElementById('confirmPasswordInput').value;
+  if(!newPass||newPass.length<4){errEl.textContent='Password must be at least 4 characters';errEl.style.display='block';return;}
+  if(newPass!==confirmPass){errEl.textContent='Passwords do not match';errEl.style.display='block';return;}
+  D.config.incomePasswordHash=simpleHash(newPass);
+  autoSave();
+  _incomeUnlocked=true; /* unlock after setting */
+  document.getElementById('incomeSetPasswordModal').classList.remove('show');
+  applyIncomeLock();
+  showToast(hasPass?'Password changed ✓':'Income password set ✓','success');
+}
+
+function applyIncomeLock(){
+  var lockBtn=document.getElementById('incomeLockBtn');
+  var incomeMetric=document.getElementById('s-income');
+  var balanceMetric=document.getElementById('s-balance');
+  var savingsMetric=document.getElementById('s-savings');
+  var incomeInput=document.getElementById('income');
+  var extraBox=document.getElementById('s-extra');
+  var locked=hasIncomePassword()&&!_incomeUnlocked;
+  /* Update lock button */
+  if(lockBtn)lockBtn.textContent=locked?'🔒':'🔓';
+  /* Hide/show income metric */
+  if(incomeMetric)incomeMetric.textContent=locked?'₹ ••••':fmt(D.config.income||0);
+  /* Hide/show balance and savings */
+  if(balanceMetric&&locked){balanceMetric.textContent='₹ ••••';}
+  if(savingsMetric&&locked){savingsMetric.textContent='₹ ••••';}
+  /* Hide/show income input */
+  if(incomeInput)incomeInput.type=locked?'password':'number';
+  /* Hide extra income */
+  if(extraBox&&locked)extraBox.textContent='₹ ••••';
+}
 function applyTheme(t){document.body.classList.remove('force-light','force-dark');if(t==='light')document.body.classList.add('force-light');if(t==='dark')document.body.classList.add('force-dark');var btn=document.getElementById('themeBtn');if(btn)btn.textContent=t==='dark'?'☀️':t==='light'?'🌙':'auto';}
 function toggleTheme(){var ts=['auto','light','dark'],cur=D.config.theme||'auto',nxt=ts[(ts.indexOf(cur)+1)%3];D.config.theme=nxt;autoSave();applyTheme(nxt);}
 function applyFontSize(f){document.body.classList.remove('fs-large','fs-small');if(f==='large')document.body.classList.add('fs-large');if(f==='small')document.body.classList.add('fs-small');var btn=document.getElementById('fontBtn');if(btn)btn.textContent=f==='large'?'A+':f==='small'?'A-':'A';}
