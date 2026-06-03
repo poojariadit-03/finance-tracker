@@ -1417,6 +1417,15 @@ function qsAddBankRow(){
   row.innerHTML='<input type="text" id="'+id+'" placeholder="e.g. Union Bank of India" style="flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none">'
     +'<button onclick="qsRemoveBankRow(\'row-'+id+'\')" style="background:none;border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;font-size:16px;cursor:pointer;color:var(--tx3);flex-shrink:0">×</button>';
   document.getElementById('qs-bank-list').appendChild(row);
+  qsUpdateRemoveBtns();
+}
+function qsUpdateRemoveBtns(){
+  var list=document.getElementById('qs-bank-list');
+  var rows=list.querySelectorAll('[id^="row-"]');
+  rows.forEach(function(row){
+    var btn=row.querySelector('button');
+    if(btn)btn.style.display=rows.length<=1?'none':'block';
+  });
 }
 function qsRemoveBankRow(rowId){
   var rows=document.getElementById('qs-bank-list').children;
@@ -1426,6 +1435,7 @@ function qsRemoveBankRow(rowId){
   var name=inp&&inp.value.trim()?inp.value.trim():'this account';
   if(!confirm('Remove "'+name+'"?'))return;
   row.parentNode.removeChild(row);
+  qsUpdateRemoveBtns();
 }
 function qsStep(n){
   [1,2,3].forEach(function(i){document.getElementById('qs-step'+i).style.display=i===n?'block':'none';});
