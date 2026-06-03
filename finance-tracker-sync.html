@@ -356,8 +356,8 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <input type="text" id="globalSearch" placeholder="🔍 All months…" oninput="doGlobalSearch(this.value)" onfocus="doGlobalSearch(this.value)" style="font-size:12px;padding:6px 10px" autocomplete="off">
       <div class="gsearch-results" id="gsearchResults"></div>
     </div>
-    <button class="btn" style="background:var(--blue)" onclick="openExportModal('report')">📊 Report</button>
-    <button class="btn" style="background:var(--green)" onclick="openExportModal('excel')">⬇ Excel</button>
+    <button class="btn export-btn" style="background:var(--blue)" onclick="openExportModal('report')">📊 Report</button>
+    <button class="btn export-btn" style="background:var(--green)" onclick="openExportModal('excel')">⬇ Excel</button>
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
     <button class="theme-btn" id="fontBtn" onclick="cycleFontSize()">A</button>
     <button class="theme-btn" id="incomeLockBtn" onclick="toggleIncomeLock()" title="Lock/Unlock income">🔒</button>
@@ -3149,7 +3149,7 @@ function applyIncomeLock(){
   var incomeInput=document.getElementById('income');
   if(incomeInput){incomeInput.type=locked?'password':'number';if(!locked&&D.config.income)incomeInput.value=D.config.income;}
   /* Report/Excel buttons */
-  document.querySelectorAll('button[onclick*="openExportModal"]').forEach(function(btn){
+  document.querySelectorAll('.export-btn').forEach(function(btn){
     if(locked){
       if(!btn.dataset.origOnclick)btn.dataset.origOnclick=btn.getAttribute('onclick');
       btn.setAttribute('onclick','showToast(\'🔒 Unlock income first to export\',\'error\')');
