@@ -3250,7 +3250,7 @@ function renderLent(){
         l.history.forEach(function(h){
           var hDate=new Date(h.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
           if(h.type==='paid')histHtml+='<div style="font-size:11px;color:var(--green);margin-bottom:3px">✓ '+hDate+' — received '+fmt(h.amt)+(h.toAccId?(' → '+((D.accounts.find(function(a){return a.id===h.toAccId;})||{}).name||'')):'')+'</div>';
-          else if(h.type==='postponed')histHtml+='<div style="font-size:11px;color:var(--amber);margin-bottom:3px">📅 '+hDate+' — postponed to '+new Date(h.newDueDate).toLocaleDateString('en-IN',{day:'numeric',month:'short'})+(h.note?' ('+h.note+')')+'</div>';
+          else if(h.type==='postponed')histHtml+='<div style="font-size:11px;color:var(--amber);margin-bottom:3px">📅 '+hDate+' — postponed to '+new Date(h.newDueDate).toLocaleDateString('en-IN',{day:'numeric',month:'short'})+(h.note?' ('+h.note+')':'')+' </div>';
         });
         histHtml+='</div>';
       }
