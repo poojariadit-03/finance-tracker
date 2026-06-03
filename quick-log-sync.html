@@ -347,6 +347,8 @@ input[type=date]:focus{border-color:var(--green)}
     <div class="field-label">Account</div>
     <div class="acc-row" id="accRow"></div>
     <div id="lentFields" style="display:none">
+      <div class="field-label">From account</div>
+      <select id="qlLentFromAcc" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;font-size:15px;color:var(--tx);font-family:inherit;outline:none;margin-bottom:14px"><option value="">— Account (optional) —</option></select>
       <div class="field-label">Return by (optional)</div>
       <input type="date" id="lentReturnByQL" class="desc-input" style="margin-bottom:14px">
     </div>
@@ -1056,6 +1058,9 @@ function setMode(m){
     document.getElementById('noteLabel').style.display='none';
     document.getElementById('expNote').style.display='none';
     document.getElementById('expTags').style.display='none';
+    /* Populate lent account dropdown */
+    var lentAccSel=document.getElementById('qlLentFromAcc');
+    if(lentAccSel){lentAccSel.innerHTML='<option value="">— Account (optional) —</option>'+(D.accounts||[]).map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join('');}
     var btn=document.getElementById('addBtn');
     btn.textContent='+ Add Lent';btn.className='add-btn';
     amtStr='';updateAmt();mode='lent';
@@ -1089,13 +1094,21 @@ function addLentQL(){
   var amt=parseFloat(amtStr);
   var dv=document.getElementById('expDate').value||todayStr();
   var returnBy=document.getElementById('lentReturnByQL')?document.getElementById('lentReturnByQL').value:'';
+  var fromAccId=document.getElementById('qlLentFromAcc')?document.getElementById('qlLentFromAcc').value:'';
   if(!name){showToast('Enter person name','error');return;}
   if(!amt||amt<=0){showToast('Enter amount','error');return;}
-  var parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
   if(!D.lent)D.lent=[];
-  D.lent.push({id:Date.now().toString(),name:name,amt:amt,date:dv,returnBy:returnBy,note:'',returned:false,returnedDate:''});
+  var entry={id:Date.now().toString(),name:name,amt:amt,originalAmt:amt,date:dv,returnBy:returnBy,note:'',fromAccId:fromAccId,returned:false,returnedDate:'',writtenOff:false,history:[]};
+  D.lent.push(entry);
+  /* Deduct from account */
+  if(fromAccId){
+    var parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
+    D.expenses.push({id:Date.now().toString()+'_lent',date:ed,month:m,name:'Lent to '+name,cat:'Other',amt:amt,accountId:fromAccId,note:'Auto-lent',isLentEntry:true,lentId:entry.id});
+  }
   autoSave();
   document.getElementById('expName').value='';amtStr='';updateAmt();
+  if(document.getElementById('lentReturnByQL'))document.getElementById('lentReturnByQL').value='';
+  if(document.getElementById('qlLentFromAcc'))document.getElementById('qlLentFromAcc').value='';
   if(navigator.vibrate)navigator.vibrate(50);
   showToast('Lent '+fmt(amt)+' to '+name,'success');
   renderList();updateLentAlertQL();
