@@ -806,6 +806,13 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     </div>
   </div>
 </div>
+<!-- LENT ACTION MODAL -->
+<div class="modal-ov" id="lentActionModal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-hd"><span class="modal-title" id="lentActionTitle">What happened?</span><button class="modal-cls" onclick="closeLentAction()">×</button></div>
+    <div id="lentActionBody"></div>
+  </div>
+</div>
 <div class="modal-ov" id="monthResetModal"><div class="modal-box"><div class="modal-hd"><span class="modal-title">🗓️ New Month!</span><button class="modal-cls" onclick="closeMonthReset()">×</button></div><div id="monthResetBody"></div><div style="margin-top:16px;display:flex;gap:10px"><button class="btn" style="flex:1" onclick="closeMonthReset()">Let's go! 🚀</button><button class="btn-ghost" onclick="closeMonthReset()">Dismiss</button></div></div></div>
 <div class="modal-ov" id="autoContribModal"><div class="modal-box"><div class="modal-hd"><span class="modal-title">⚙️ Auto-contribution</span><button class="modal-cls" onclick="document.getElementById('autoContribModal').classList.remove('show')">×</button></div><p style="font-size:13px;color:var(--tx2);margin-bottom:14px">Set a fixed monthly amount to auto-add to this goal.</p><div id="autoContribGoalName" style="font-size:15px;font-weight:600;margin-bottom:14px"></div><div class="irow"><input type="number" id="autoContribAmt" placeholder="Monthly ₹" min="0" style="flex:1"><input type="number" id="autoContribDay" placeholder="Day of month e.g. 5" min="1" max="28" style="max-width:155px"></div><div style="font-size:12px;color:var(--tx3);margin-bottom:14px">Enter 0 to disable.</div><button class="btn" style="width:100%" onclick="saveAutoContrib()">Save</button></div></div>
 <div class="modal-ov" id="exportModal">
@@ -858,27 +865,33 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div class="metric"><div class="mlabel">Total Lent</div><div class="mval red" id="lent-total">₹0</div></div>
     <div class="metric"><div class="mlabel">Pending</div><div class="mval" style="color:var(--amber)" id="lent-pending">₹0</div></div>
     <div class="metric"><div class="mlabel">Returned</div><div class="mval green" id="lent-returned">₹0</div></div>
+    <div class="metric"><div class="mlabel">Written Off</div><div class="mval" style="color:var(--tx3)" id="lent-writtenoff">₹0</div></div>
   </div>
   <div class="card">
     <div class="card-hd"><span class="ctitle">Lend money</span></div>
     <div class="irow">
       <input type="text" id="lentName" placeholder="Person name e.g. Rahul" style="flex:2">
-      <input type="number" id="lentAmt" placeholder="₹ Amount" style="max-width:140px">
-      <input type="date" id="lentDate" style="max-width:145px">
-      <input type="date" id="lentReturnBy" style="max-width:145px">
+      <input type="number" id="lentAmt" placeholder="₹ Amount" style="max-width:130px">
+      <select id="lentFromAcc" style="max-width:150px"></select>
     </div>
     <div class="irow">
+      <input type="date" id="lentDate" style="max-width:145px">
+      <input type="date" id="lentReturnBy" placeholder="Return by (optional)" style="max-width:145px">
       <input type="text" id="lentNote" placeholder="Note (optional)" style="flex:1">
       <button class="btn" onclick="addLent()" style="background:var(--red)">+ Add Lent</button>
     </div>
   </div>
   <div class="card">
     <div class="card-hd"><span class="ctitle">Pending returns</span><span id="lentOverdueNote" style="font-size:12px;color:var(--red)"></span></div>
-    <div id="lentPendingList"><p class="empty">No pending amounts.</p></div>
+    <div id="lentPendingList"><p class="empty">No pending amounts. 🎉</p></div>
   </div>
   <div class="card">
     <div class="card-hd"><span class="ctitle">Returned ✓</span></div>
     <div id="lentReturnedList"><p class="empty">No returned amounts yet.</p></div>
+  </div>
+  <div class="card" id="lentWrittenOffCard" style="display:none">
+    <div class="card-hd"><span class="ctitle">Written off ❌</span></div>
+    <div id="lentWrittenOffList"></div>
   </div>
 </div>
 <div id="ftToast" class="ft-toast"></div>
@@ -3038,44 +3051,136 @@ function exportReport(months){
 
 
 /* ═══ LENT MONEY TRACKER ═══ */
+/* ═══ LENT — PHASE 1 ═══ */
+function populateLentAccSel(){
+  var sel=document.getElementById('lentFromAcc');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— Account (optional) —</option>'+D.accounts.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join('');
+}
 function addLent(){
   var name=document.getElementById('lentName').value.trim();
   var amt=parseFloat(document.getElementById('lentAmt').value);
   var date=document.getElementById('lentDate').value||todayStr();
   var returnBy=document.getElementById('lentReturnBy').value||'';
   var note=document.getElementById('lentNote').value.trim();
-  if(!name||isNaN(amt)||amt<=0)return;
-  if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];
-  D.lent.push({id:Date.now().toString(),name:name,amt:amt,date:date,returnBy:returnBy,note:note,returned:false,returnedDate:''});
+  var fromAccId=document.getElementById('lentFromAcc').value||'';
+  if(!name){showToast('Enter person name','error');return;}
+  if(isNaN(amt)||amt<=0){showToast('Enter valid amount','error');return;}
+  if(!D.lent)D.lent=[];
+  var entry={
+    id:Date.now().toString(),
+    name:name,amt:amt,originalAmt:amt,
+    date:date,returnBy:returnBy,note:note,
+    fromAccId:fromAccId,
+    returned:false,returnedDate:'',
+    writtenOff:false,
+    history:[] /* [{type,amt,date,note,toAccId,newDueDate}] */
+  };
+  D.lent.push(entry);
+  /* Deduct from account if selected */
+  if(fromAccId){
+    var acc=D.accounts.find(function(a){return a.id===fromAccId;});
+    if(acc){
+      D.expenses.push({id:Date.now().toString()+'_lent',date:new Date(date+'T12:00:00').toISOString(),month:date.slice(0,7),name:'Lent to '+name,cat:'Other',amt:amt,accountId:fromAccId,note:'Auto-lent',isLentEntry:true,lentId:entry.id});
+    }
+  }
   autoSave();
   document.getElementById('lentName').value='';document.getElementById('lentAmt').value='';
   document.getElementById('lentReturnBy').value='';document.getElementById('lentNote').value='';
-  renderLent();updateLentBadge();
+  document.getElementById('lentFromAcc').value='';
+  renderLent();updateLentBadge();renderExpenses();recalc();renderAccounts();
   showToast('Lent '+fmt(amt)+' to '+name,'success');
 }
 
-function partialReturn(id){
+var _lentActionId=null;
+function openLentAction(id){
   var entry=(D.lent||[]).find(function(l){return l.id===id;});
   if(!entry)return;
-  var amtStr=prompt('How much was returned? (Original: '+fmt(entry.amt)+')');
-  if(!amtStr)return;
-  var amt=parseFloat(amtStr);
-  if(isNaN(amt)||amt<=0){showToast('Invalid amount','error');return;}
-  if(amt>=entry.amt){markReturned(id);return;}
-  /* Reduce remaining amount */
-  entry.amt=Math.round((entry.amt-amt)*100)/100;
-  entry.note=(entry.note?entry.note+' | ':'')+fmt(amt)+' returned on '+todayStr();
-  autoSave();renderLent();updateLentBadge();
-  showToast(fmt(amt)+' partial return recorded. Remaining: '+fmt(entry.amt),'success');
+  _lentActionId=id;
+  document.getElementById('lentActionTitle').textContent=entry.name+' owes you '+fmt(entry.amt);
+  var accOpts=D.accounts.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join('');
+  var html=
+    /* Option 1: Paid */
+    '<div style="margin-bottom:14px;padding:12px;background:var(--gbg);border-radius:10px;border:1px solid var(--green)">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--green);margin-bottom:10px">✅ He paid</div>'
+    +'<div class="irow" style="margin-bottom:8px">'
+    +'<input type="number" id="la-paid-amt" placeholder="Amount received ₹" value="'+entry.amt+'" style="flex:1">'
+    +'<select id="la-paid-acc" style="max-width:160px"><option value="">— Into account —</option>'+accOpts+'</select>'
+    +'</div>'
+    +'<input type="date" id="la-paid-date" value="'+todayStr()+'" style="width:100%;margin-bottom:8px;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--tx);font-family:inherit;outline:none">'
+    +'<button class="btn" style="width:100%;background:var(--green)" onclick="applyLentPaid()">✓ Confirm payment</button>'
+    +'</div>'
+    /* Option 2: Postpone */
+    +'<div style="margin-bottom:14px;padding:12px;background:var(--abg);border-radius:10px;border:1px solid var(--amber)">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--amber);margin-bottom:10px">📅 Postponed — new date promised</div>'
+    +'<input type="date" id="la-post-date" style="width:100%;margin-bottom:8px;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--tx);font-family:inherit;outline:none">'
+    +'<input type="text" id="la-post-note" placeholder="Note e.g. after salary" style="width:100%;margin-bottom:8px;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--tx);font-family:inherit;outline:none">'
+    +'<button class="btn" style="width:100%;background:var(--amber);color:#fff" onclick="applyLentPostpone()">📅 Update due date</button>'
+    +'</div>'
+    /* Option 3: Write off */
+    +'<div style="padding:12px;background:var(--rbg);border-radius:10px;border:1px solid var(--red)">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--red);margin-bottom:10px">❌ Write off</div>'
+    +'<input type="text" id="la-woff-note" placeholder="Reason (optional)" style="width:100%;margin-bottom:8px;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--tx);font-family:inherit;outline:none">'
+    +'<button class="btn" style="width:100%;background:var(--red)" onclick="applyLentWriteOff()">❌ Write off this amount</button>'
+    +'</div>';
+  document.getElementById('lentActionBody').innerHTML=html;
+  document.getElementById('lentActionModal').classList.add('show');
+}
+function closeLentAction(){document.getElementById('lentActionModal').classList.remove('show');_lentActionId=null;}
+
+function applyLentPaid(){
+  var entry=(D.lent||[]).find(function(l){return l.id===_lentActionId;});if(!entry)return;
+  var paidAmt=parseFloat(document.getElementById('la-paid-amt').value);
+  var toAccId=document.getElementById('la-paid-acc').value;
+  var paidDate=document.getElementById('la-paid-date').value||todayStr();
+  if(isNaN(paidAmt)||paidAmt<=0){showToast('Enter valid amount','error');return;}
+  /* Log history */
+  entry.history=entry.history||[];
+  entry.history.push({type:'paid',amt:paidAmt,date:paidDate,toAccId:toAccId,note:''});
+  /* Credit to account if selected */
+  if(toAccId){
+    var acc=D.accounts.find(function(a){return a.id===toAccId;});
+    if(acc){
+      (D.extraIncome=D.extraIncome||[]).push({id:Date.now().toString()+'_lr',date:new Date(paidDate+'T12:00:00').toISOString(),month:paidDate.slice(0,7),name:'Received from '+entry.name,source:'Other',amt:paidAmt,accountId:toAccId,isLentReturn:true,lentId:entry.id});
+    }
+  }
+  if(paidAmt>=entry.amt){
+    /* Fully returned */
+    entry.returned=true;entry.returnedDate=paidDate;entry.amt=0;
+    showToast(fmt(paidAmt)+' fully returned by '+entry.name+' ✓','success');
+  } else {
+    /* Partial */
+    entry.amt=Math.round((entry.amt-paidAmt)*100)/100;
+    showToast(fmt(paidAmt)+' received. Remaining: '+fmt(entry.amt),'success');
+  }
+  autoSave();closeLentAction();renderLent();updateLentBadge();renderExtraIncome();recalc();renderAccounts();
+}
+function applyLentPostpone(){
+  var entry=(D.lent||[]).find(function(l){return l.id===_lentActionId;});if(!entry)return;
+  var newDate=document.getElementById('la-post-date').value;
+  var note=document.getElementById('la-post-note').value.trim();
+  if(!newDate){showToast('Select a new due date','error');return;}
+  entry.history=entry.history||[];
+  entry.history.push({type:'postponed',date:todayStr(),newDueDate:newDate,note:note});
+  entry.returnBy=newDate;
+  autoSave();closeLentAction();renderLent();updateLentBadge();
+  showToast('Due date updated to '+new Date(newDate).toLocaleDateString('en-IN',{day:'numeric',month:'short'}),'success');
+}
+function applyLentWriteOff(){
+  var entry=(D.lent||[]).find(function(l){return l.id===_lentActionId;});if(!entry)return;
+  var note=document.getElementById('la-woff-note').value.trim();
+  if(!confirm('Write off ₹'+entry.amt+' from '+entry.name+'? This cannot be undone.'))return;
+  entry.history=entry.history||[];
+  entry.history.push({type:'writtenoff',amt:entry.amt,date:todayStr(),note:note});
+  entry.writtenOff=true;entry.returned=true;entry.returnedDate=todayStr();
+  entry.note=(entry.note?entry.note+' | ':'')+'Written off'+(note?': '+note:'');
+  autoSave();closeLentAction();renderLent();updateLentBadge();
+  showToast('Written off '+fmt(entry.amt),'info');
 }
 
-function markReturned(id){
-  var entry=(D.lent||[]).find(function(l){return l.id===id;});
-  if(!entry)return;
-  entry.returned=true;entry.returnedDate=todayStr();
-  autoSave();renderLent();updateLentBadge();
-  showToast(fmt(entry.amt)+' returned by '+entry.name+'!','success');
-}
+function partialReturn(id){openLentAction(id);}
+function markReturned(id){openLentAction(id);}
+
 function deleteLent(id){
   if(!confirm('Delete this lent entry?'))return;
   D.lent=(D.lent||[]).filter(function(l){return l.id!==id;});
@@ -3091,25 +3196,31 @@ function updateLentBadge(){
   else{badge.style.display='none';}
 }
 function renderLent(){
+  /* Migrate old entries — add history array if missing */
+  (D.lent||[]).forEach(function(l){if(!l.history)l.history=[];if(l.originalAmt===undefined)l.originalAmt=l.amt;});
   var lent=D.lent||[];
   var today=new Date();today.setHours(0,0,0,0);
-  var pending=lent.filter(function(l){return !l.returned;});
-  var returned=lent.filter(function(l){return l.returned;});
-  var totalLent=lent.reduce(function(s,l){return s+l.amt;},0);
+  var pending=lent.filter(function(l){return !l.returned&&!l.writtenOff;});
+  var returned=lent.filter(function(l){return l.returned&&!l.writtenOff;});
+  var writtenOff=lent.filter(function(l){return l.writtenOff;});
+  var totalLent=lent.reduce(function(s,l){return s+(l.originalAmt||l.amt);},0);
   var totalPending=pending.reduce(function(s,l){return s+l.amt;},0);
-  var totalReturned=returned.reduce(function(s,l){return s+l.amt;},0);
+  var totalReturned=returned.reduce(function(s,l){return s+(l.originalAmt||l.amt);},0);
+  var totalWO=writtenOff.reduce(function(s,l){return s+(l.originalAmt||l.amt);},0);
   document.getElementById('lent-total').textContent=fmt(totalLent);
   document.getElementById('lent-pending').textContent=fmt(totalPending);
   document.getElementById('lent-returned').textContent=fmt(totalReturned);
+  var woEl=document.getElementById('lent-writtenoff');if(woEl)woEl.textContent=fmt(totalWO);
+  /* Populate account selector */
+  populateLentAccSel();
   /* Overdue note */
   var overdue=pending.filter(function(l){return l.returnBy&&new Date(l.returnBy)<today;});
   var odEl=document.getElementById('lentOverdueNote');
   if(odEl)odEl.textContent=overdue.length?'⚠️ '+overdue.length+' overdue!':'';
-  /* Pending list */
+  /* Pending list — GLOBAL, no month filter */
   var pEl=document.getElementById('lentPendingList');
   if(!pending.length){pEl.innerHTML='<p class="empty">No pending amounts. 🎉</p>';}
   else{
-    /* Sort: overdue first, then by returnBy date */
     pending.sort(function(a,b){
       var aOver=a.returnBy&&new Date(a.returnBy)<today;
       var bOver=b.returnBy&&new Date(b.returnBy)<today;
@@ -3119,6 +3230,7 @@ function renderLent(){
     });
     pEl.innerHTML=pending.map(function(l){
       var lentDate=new Date(l.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+      var fromAcc=l.fromAccId?D.accounts.find(function(a){return a.id===l.fromAccId;}):null;
       var pill='';
       if(l.returnBy){
         var rb=new Date(l.returnBy);rb.setHours(0,0,0,0);
@@ -3126,9 +3238,20 @@ function renderLent(){
         if(diff<0)pill='<span class="overdue-pill">Overdue by '+Math.abs(diff)+'d</span>';
         else if(diff===0)pill='<span class="overdue-pill">Due TODAY</span>';
         else if(diff<=3)pill='<span class="due-soon-pill">Due in '+diff+'d</span>';
-        else pill='<span style="font-size:10px;color:var(--tx3);margin-left:6px">Due '+rb.toLocaleDateString('en-IN',{day:"numeric",month:"short"})+'</span>';
+        else pill='<span style="font-size:10px;color:var(--tx3);margin-left:6px">Due '+rb.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+'</span>';
       }
-      return '<div class="lent-item"><div class="lent-left"><div class="lent-name">'+l.name+pill+'</div><div class="lent-meta">Lent on '+lentDate+(l.note?' · '+l.note:'')+'</div></div><div class="lent-right"><span style="font-family:monospace;font-weight:600;font-size:15px;color:var(--red)">'+fmt(l.amt)+'</span><button class="return-btn" onclick="markReturned(\''+l.id+'\')" >✓ Returned</button><button class="btn-ghost" style="padding:4px 8px;font-size:11px" onclick="partialReturn(\''+l.id+'\')" title="Partial">↩ Partial</button><button class="del-btn" onclick="deleteLent(\''+l.id+'\')" >×</button></div></div>';
+      /* History log */
+      var histHtml='';
+      if(l.history&&l.history.length){
+        histHtml='<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr)">';
+        l.history.forEach(function(h){
+          var hDate=new Date(h.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+          if(h.type==='paid')histHtml+='<div style="font-size:11px;color:var(--green);margin-bottom:3px">✓ '+hDate+' — received '+fmt(h.amt)+(h.toAccId?(' → '+((D.accounts.find(function(a){return a.id===h.toAccId;})||{}).name||'')):'')+'</div>';
+          else if(h.type==='postponed')histHtml+='<div style="font-size:11px;color:var(--amber);margin-bottom:3px">📅 '+hDate+' — postponed to '+new Date(h.newDueDate).toLocaleDateString('en-IN',{day:'numeric',month:'short'})+(h.note?' ('+h.note+')')+'</div>';
+        });
+        histHtml+='</div>';
+      }
+      return '<div class="lent-item"><div class="lent-left"><div class="lent-name">'+l.name+pill+'</div><div class="lent-meta">Lent '+lentDate+(fromAcc?' · from '+fromAcc.name:'')+(l.note?' · '+l.note:'')+'</div>'+histHtml+'</div><div class="lent-right"><div><span style="font-family:monospace;font-weight:600;font-size:15px;color:var(--red)">'+fmt(l.amt)+'</span>'+(l.originalAmt&&l.originalAmt!==l.amt?'<div style="font-size:10px;color:var(--tx3)">of '+fmt(l.originalAmt)+'</div>':'')+'</div><button class="btn" style="background:var(--amber);padding:6px 10px;font-size:12px" onclick="openLentAction(\''+l.id+'\')">What happened?</button><button class="del-btn" onclick="deleteLent(\''+l.id+'\')" >×</button></div></div>';
     }).join('');
   }
   /* Returned list */
@@ -3138,7 +3261,17 @@ function renderLent(){
     rEl.innerHTML=returned.slice().reverse().map(function(l){
       var lentDate=new Date(l.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
       var retDate=l.returnedDate?new Date(l.returnedDate).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'—';
-      return '<div class="lent-item"><div class="lent-left"><div class="lent-name" style="color:var(--tx2)">'+l.name+'</div><div class="lent-meta">Lent '+lentDate+' · Returned '+retDate+(l.note?' · '+l.note:'')+'</div></div><div class="lent-right"><span style="font-family:monospace;font-size:14px;color:var(--green)">'+fmt(l.amt)+'</span><button class="del-btn" onclick="deleteLent(\''+l.id+'\')" >×</button></div></div>';
+      return '<div class="lent-item"><div class="lent-left"><div class="lent-name" style="color:var(--tx2)">'+l.name+'</div><div class="lent-meta">Lent '+lentDate+' · Returned '+retDate+(l.note?' · '+l.note:'')+'</div></div><div class="lent-right"><span style="font-family:monospace;font-size:14px;color:var(--green)">'+fmt(l.originalAmt||l.amt)+'</span><button class="del-btn" onclick="deleteLent(\''+l.id+'\')" >×</button></div></div>';
+    }).join('');
+  }
+  /* Written off */
+  var woCard=document.getElementById('lentWrittenOffCard');
+  var woList=document.getElementById('lentWrittenOffList');
+  if(woCard&&woList){
+    woCard.style.display=writtenOff.length?'block':'none';
+    woList.innerHTML=writtenOff.map(function(l){
+      var lentDate=new Date(l.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+      return '<div class="lent-item"><div class="lent-left"><div class="lent-name" style="color:var(--tx3);text-decoration:line-through">'+l.name+'</div><div class="lent-meta">Lent '+lentDate+(l.note?' · '+l.note:'')+'</div></div><div class="lent-right"><span style="font-family:monospace;font-size:14px;color:var(--tx3)">'+fmt(l.originalAmt||l.amt)+'</span><button class="del-btn" onclick="deleteLent(\''+l.id+'\')" >×</button></div></div>';
     }).join('');
   }
   updateLentBadge();
@@ -3500,7 +3633,7 @@ function renderAll(){
   var salDay=document.getElementById('salaryCreditDay');if(salDay&&D.config.salaryCreditDay)salDay.value=D.config.salaryCreditDay;
   renderAccounts();populateAccSel();populateTransferSelects();
   if(document.getElementById('fixedSummary'))renderFixedSummary();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();autoLogFixed();
-  renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();renderSalaryHistory();
+  renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();renderSalaryHistory();populateLentAccSel();
   applyTheme(D.config.theme||'auto');applyFontSize(D.config.fontSize||'normal');updateLentBadge();renderLent();
   var incDt=document.getElementById('incDate');if(incDt)incDt.value=todayStr();
   if(D.config&&D.config.dailyLimit){var dli=document.getElementById('dailyLimitInput');if(dli)dli.value=D.config.dailyLimit;}
