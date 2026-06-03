@@ -1086,7 +1086,7 @@ function listenForChanges(){
         if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.occasions)fresh.occasions=[];if(!fresh.lent)fresh.lent=[];
         if(!fresh.liabilities)fresh.liabilities=[];
         if(!fresh.config)fresh.config={};if(!fresh.config.dailyLimit)fresh.config.dailyLimit=0;
-        if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;var _wasUnlocked=_incomeUnlocked;renderAll();_incomeUnlocked=_wasUnlocked;applyIncomeLock();}
+        if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;var _wasUnlocked=_incomeUnlocked;_incomeUnlocked=_wasUnlocked;renderAll();}
       }catch(e){}
     }
   });
@@ -1323,6 +1323,11 @@ function recalc(){
 
 /* ═══ MONTHLY SUMMARY ═══ */
 function renderMonthlySummary(){
+  if(hasIncomePassword()&&!_incomeUnlocked){
+    var el=document.getElementById('monthlySummary');
+    if(el)el.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">🔒 Unlock to view monthly summary</div>';
+    return;
+  }
   var income=(D.config.income||0)+extraIncomeTotal(),fxd=fixedMonthly(),exps=getExpenses();
   var spent=exps.reduce(function(s,e){return s+e.amt;},0),savA=Math.max(0,income-fxd-spent),savT=income*(D.config.savpct||20)/100;
   var lastDate=new Date(curDate.getFullYear(),curDate.getMonth()-1,1),lastSpent=getExpenses(lastDate).reduce(function(s,e){return s+e.amt;},0),lastIncome=(D.config.income||0)+extraIncomeTotal(lastDate),lastSavA=Math.max(0,lastIncome-fxd-lastSpent);
