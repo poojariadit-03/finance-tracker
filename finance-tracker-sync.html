@@ -806,6 +806,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <div class="modal-box" style="max-width:340px;text-align:center">
     <div class="modal-hd"><span class="modal-title">🔒 Enter Password</span><button class="modal-cls" onclick="document.getElementById('incomeUnlockModal').classList.remove('show')">×</button></div>
     <p style="font-size:13px;color:var(--tx2);margin-bottom:16px">Enter your income password to view sensitive data.</p>
+    <div id="unlockHintRow" style="display:none;font-size:12px;color:var(--tx3);margin-bottom:12px;padding:8px 12px;background:var(--sur2);border-radius:8px">💡 Hint: <span id="unlockHintText"></span></div>
     <input type="password" id="unlockPasswordInput" placeholder="Enter password" style="width:100%;margin-bottom:12px;text-align:center;font-size:18px;letter-spacing:4px" onkeydown="if(event.key==='Enter')verifyIncomePassword()">
     <div id="unlockError" style="font-size:12px;color:var(--red);margin-bottom:10px;display:none">Wrong password. Try again.</div>
     <button class="btn" style="width:100%;background:var(--green)" onclick="verifyIncomePassword()">Unlock →</button>
@@ -826,6 +827,10 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div style="margin-bottom:14px">
       <div style="font-size:12px;color:var(--tx3);margin-bottom:5px">Confirm password</div>
       <input type="password" id="confirmPasswordInput" placeholder="Confirm password" style="width:100%">
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:5px">Password hint <span style="font-weight:400">(only you should understand this)</span></div>
+      <input type="text" id="passwordHintInput" placeholder="e.g. my dog's name, favourite city" style="width:100%">
     </div>
     <div id="setPwdError" style="font-size:12px;color:var(--red);margin-bottom:10px;display:none"></div>
     <button class="btn" style="width:100%;background:var(--green)" onclick="saveIncomePassword()">Save Password</button>
@@ -3069,6 +3074,12 @@ function toggleIncomeLock(){
     /* Unlock — show password modal */
     document.getElementById('unlockPasswordInput').value='';
     document.getElementById('unlockError').style.display='none';
+    /* Show hint if set */
+    var hint=D.config.incomePasswordHint||'';
+    var hintRow=document.getElementById('unlockHintRow');
+    var hintText=document.getElementById('unlockHintText');
+    if(hint&&hintRow&&hintText){hintRow.style.display='block';hintText.textContent=hint;}
+    else if(hintRow){hintRow.style.display='none';}
     document.getElementById('incomeUnlockModal').classList.add('show');
     setTimeout(function(){document.getElementById('unlockPasswordInput').focus();},300);
   }
@@ -3098,6 +3109,7 @@ function openSetPassword(){
   document.getElementById('oldPasswordInput').value='';
   document.getElementById('newPasswordInput').value='';
   document.getElementById('confirmPasswordInput').value='';
+  document.getElementById('passwordHintInput').value=D.config.incomePasswordHint||'';
   document.getElementById('setPwdError').style.display='none';
   document.getElementById('incomeSetPasswordModal').classList.add('show');
 }
@@ -3117,6 +3129,7 @@ function saveIncomePassword(){
   if(!newPass||newPass.length<4){errEl.textContent='Password must be at least 4 characters';errEl.style.display='block';return;}
   if(newPass!==confirmPass){errEl.textContent='Passwords do not match';errEl.style.display='block';return;}
   D.config.incomePasswordHash=simpleHash(newPass);
+  D.config.incomePasswordHint=document.getElementById('passwordHintInput').value.trim();
   autoSave();
   _incomeUnlocked=true; /* unlock after setting */
   document.getElementById('incomeSetPasswordModal').classList.remove('show');
