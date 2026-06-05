@@ -395,8 +395,8 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div class="metric" id="s-extra-box" style="display:none"><div class="mlabel">Extra Income</div><div class="mval green" id="s-extra">₹0</div></div>
     <div class="metric"><div class="mlabel">Fixed <span id="fixedEstLabel" style="font-size:9px;color:var(--tx3);font-weight:400"></span></div><div class="mval red" id="s-fixed">₹0</div></div>
     <div class="metric"><div class="mlabel">Spent</div><div class="mval red" id="s-daily">₹0</div></div>
-    <div class="metric"><div class="mlabel">Savings</div><div class="mval green" id="s-savings">₹0</div></div>
-    <div class="metric"><div class="mlabel">Balance</div><div class="mval" id="s-balance">₹0</div></div>
+    <div class="metric"><div class="mlabel">Surplus</div><div class="mval green" id="s-savings">₹0</div></div>
+    <div class="metric"><div class="mlabel">Bank Balance</div><div class="mval" id="s-balance">₹0</div></div>
     <div class="metric" id="s-today-box"><div class="mlabel">Today spent</div><div class="mval" id="s-today-spent">₹0</div></div>
   </div>
   <div class="card" id="healthScoreCard">
@@ -1308,7 +1308,9 @@ function toggleForm(id){var el=document.getElementById(id);el.style.display=el.s
 /* ═══ RECALC ═══ */
 function recalc(){
   var baseIncome=D.config.income||0,extraInc=extraIncomeTotal(),income=baseIncome,totalIncome=baseIncome+extraInc,fxd=fixedMonthly(),spent=getExpenses().reduce(function(s,e){return s+e.amt;},0);
-  var savT=totalIncome*(D.config.savpct||20)/100,savA=Math.max(0,totalIncome-fxd-spent),bal=totalIncome-fxd-spent;
+  var savT=totalIncome*(D.config.savpct||20)/100,savA=Math.max(0,totalIncome-fxd-spent);
+  /* Actual bank balance = sum of all account balances */
+  var actualBal=D.accounts.reduce(function(s,a){return s+getAccountBalance(a.id);},0);
   var locked=hasIncomePassword()&&!_incomeUnlocked;
   var MASK='₹ ••••';
   document.getElementById('s-income').textContent=locked?MASK:fmt(income);
@@ -1316,7 +1318,7 @@ function recalc(){
   if(extraInc>0){extraBox.style.display='block';extraEl.textContent='+'+fmt(extraInc);}else extraBox.style.display='none';
   var spPct=totalIncome>0?spent/totalIncome*100:0,spBan=document.getElementById('spendBanner');
   if(income>0&&(fxd+spent)>=totalIncome&&spent>0){spBan.style.display='flex';document.getElementById('spendBannerText').textContent='🚨 Exceeded income! Fixed+Spent '+fmt(fxd+spent)+' of '+fmt(totalIncome);}
-  else if(income>0&&spPct>=80){spBan.style.display='flex';document.getElementById('spendBannerText').textContent='⚠️ '+spPct.toFixed(0)+'% of income spent on expenses — only '+fmt(totalIncome-fxd-spent)+' left!';}
+  else if(income>0&&spPct>=80){spBan.style.display='flex';document.getElementById('spendBannerText').textContent='⚠️ '+spPct.toFixed(0)+'% of income spent on expenses — only '+fmt(Math.max(0,totalIncome-fxd-spent))+' left!';}
   else spBan.style.display='none';
   renderExtraIncome();checkSavingsStreak();
   document.getElementById('s-fixed').textContent=fmt(fxd);
@@ -1324,7 +1326,7 @@ function recalc(){
   var _estLbl=document.getElementById('fixedEstLabel');if(_estLbl)_estLbl.textContent=_hasNonMon?'(est.)':'';
   document.getElementById('s-daily').textContent=fmt(spent);
   document.getElementById('s-savings').textContent=fmt(savA);
-  var bEl=document.getElementById('s-balance');bEl.textContent=fmt(bal);bEl.className='mval '+(bal>=0?'green':'red');
+  var bEl=document.getElementById('s-balance');bEl.textContent=fmt(actualBal);bEl.className='mval '+(actualBal>=0?'green':'red');
   var _td=new Date(),_tdSpent=D.expenses.filter(function(e){var d=new Date(e.date);return d.getFullYear()===_td.getFullYear()&&d.getMonth()===_td.getMonth()&&d.getDate()===_td.getDate();}).reduce(function(s,e){return s+e.amt;},0);
   var tdEl=document.getElementById('s-today-spent'),tdBox=document.getElementById('s-today-box');
   if(tdEl){tdEl.textContent=fmt(_tdSpent);tdEl.className='mval '+(D.config.dailyLimit&&_tdSpent>D.config.dailyLimit?'red':'');}
