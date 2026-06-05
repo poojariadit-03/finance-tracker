@@ -2378,6 +2378,7 @@ function removeGoal(id){if(!confirm('Delete this goal?'))return;D.goals=D.goals.
 
 function addWithdrawal(id){
   var inp=document.getElementById('withdraw-'+id);
+  var dateInp=document.getElementById('withdraw-date-'+id);
   if(!inp)return;
   var amt=parseFloat(inp.value);
   if(isNaN(amt)||amt<=0)return;
@@ -2385,12 +2386,28 @@ function addWithdrawal(id){
   var saved=Math.max(0,(g.contributions||[]).reduce(function(s,c){return s+c.amount;},0));
   if(amt>saved){showToast('Cannot withdraw more than saved amount','error');return;}
   if(!g.contributions)g.contributions=[];
-  g.contributions.push({month:mk(),amount:-amt,destination:'Withdrawal',date:new Date().toISOString(),isWithdrawal:true});
+  var dateVal=dateInp&&dateInp.value?dateInp.value:todayStr();
+  var iso=new Date(dateVal+'T12:00:00').toISOString();
+  var month=dateVal.slice(0,7);
+  g.contributions.push({month:month,amount:-amt,destination:'Withdrawal',date:iso,isWithdrawal:true});
   autoSave();inp.value='';renderGoals();
   showToast('Withdrew '+fmt(amt)+' from goal','success');
 }
-
-function addContrib(id){var inp=document.getElementById('contrib-'+id),amt=parseFloat(inp.value),dest=document.getElementById('contrib-dest-'+id).value;if(isNaN(amt)||amt<=0)return;var g=D.goals.find(function(g){return g.id===id;});if(!g)return;g.contributions.push({month:mk(),amount:amt,destination:dest,date:new Date().toISOString()});autoSave();inp.value='';renderGoals();}
+function addContrib(id){
+  var inp=document.getElementById('contrib-'+id);
+  var dateInp=document.getElementById('contrib-date-'+id);
+  if(!inp)return;
+  var amt=parseFloat(inp.value);
+  if(isNaN(amt)||amt<=0){showToast('Enter amount','error');return;}
+  var g=D.goals.find(function(g){return g.id===id;});if(!g)return;
+  if(!g.contributions)g.contributions=[];
+  var dateVal=dateInp&&dateInp.value?dateInp.value:todayStr();
+  var iso=new Date(dateVal+'T12:00:00').toISOString();
+  var month=dateVal.slice(0,7);
+  g.contributions.push({month:month,amount:amt,date:iso});
+  autoSave();inp.value='';renderGoals();
+  showToast(fmtF(amt)+' added to '+g.name+' ✓','success');
+}
 function removeContrib(goalId,idx){var g=D.goals.find(function(g){return g.id===goalId;});if(!g)return;g.contributions.splice(idx,1);autoSave();renderGoals();}
 function renderGoals(){
   var goals=D.goals,container=document.getElementById('goalCards');
@@ -2452,14 +2469,16 @@ function renderGoals(){
       /* Deadline hint */
       +(dlNote?'<div style="font-size:12px;color:var(--amber);margin-bottom:10px;padding:8px 10px;background:var(--abg);border-radius:8px">⏰ '+dlNote+'</div>':'')
       /* Add contribution */
-      +'<div style="display:flex;gap:8px;margin-bottom:8px">'
-        +'<input type="number" id="contrib-'+g.id+'" placeholder="₹ Add amount" min="1" step="100" style="flex:1">'
+      +'<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">'
+        +'<input type="number" id="contrib-'+g.id+'" placeholder="₹ Add amount" min="1" step="100" style="flex:1;min-width:100px">'
+        +'<input type="date" id="contrib-date-'+g.id+'" value="'+todayStr()+'" style="max-width:145px">'
         +'<button class="btn" style="background:var(--green);padding:7px 14px" onclick="addContrib(\''+g.id+'\')">+ Add</button>'
         +'<button class="btn-ghost" style="padding:7px 10px" onclick="openAutoContrib(\''+g.id+'\')">⚙ Auto</button>'
       +'</div>'
-      /* Withdraw — collapsed, only show button */
-      +'<div style="display:flex;gap:8px;margin-bottom:8px">'
-        +'<input type="number" id="withdraw-'+g.id+'" placeholder="₹ Withdraw amount" min="1" step="100" style="flex:1">'
+      /* Withdraw */
+      +'<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">'
+        +'<input type="number" id="withdraw-'+g.id+'" placeholder="₹ Withdraw amount" min="1" step="100" style="flex:1;min-width:100px">'
+        +'<input type="date" id="withdraw-date-'+g.id+'" value="'+todayStr()+'" style="max-width:145px">'
         +'<button class="btn" style="background:var(--red);padding:7px 14px" onclick="addWithdrawal(\''+g.id+'\')">- Withdraw</button>'
       +'</div>'
       /* Recent contributions */
