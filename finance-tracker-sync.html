@@ -531,6 +531,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx3);margin-bottom:4px"><span>Savings progress</span><span id="savProg">₹0 / ₹0</span></div><div class="pbg"><div class="pfill" id="savBar" style="width:0%;background:var(--green)"></div></div></div>
   </div>
   <div class="card"><div class="card-hd"><span class="ctitle">Budget health</span></div><div id="budgetHealth"></div></div>
+  <div class="card" id="upcomingBillsCard"><div class="card-hd"><span class="ctitle">📅 Upcoming bills</span><span style="font-size:11px;color:var(--tx3)">Next 7 days</span></div><div id="upcomingBills"></div></div>
   <div class="card"><div class="card-hd"><span class="ctitle" id="sumTitle">This month summary</span></div><div id="monthlySummary"></div></div>
   <div class="card" id="weeklyCard"><div class="card-hd"><span class="ctitle" id="weekTitle">This week</span><span style="font-size:12px;color:var(--tx3)" id="weekRange"></span></div><div id="weeklySummary"></div></div>
   <div class="card" id="nwSnapshotCard" style="margin-bottom:.75rem">
@@ -2133,6 +2134,56 @@ function copyLastMonthBudget(){
   Object.keys(cats).forEach(function(cat){D.budgets[cat]=Math.ceil(cats[cat]/100)*100;});
   autoSave();renderBudgetBars();checkBudgetAlerts();
   showToast('Budgets set from last month\'s spending','success');
+}
+function renderUpcomingBills(){
+  var card=document.getElementById('upcomingBillsCard');
+  var el=document.getElementById('upcomingBills');
+  if(!el)return;
+  var today=new Date().getDate();
+  var paid=getPaid();
+  /* Get bills due in next 7 days (today to today+7) */
+  var upcoming=D.fixed.filter(function(f){
+    if(!f.dueDay||!f.recurring)return false;
+    var diff=f.dueDay-today;
+    /* Also handle month wrap — e.g today=28, due=2 next month */
+    return diff>=0&&diff<=7;
+  }).sort(function(a,b){return a.dueDay-b.dueDay;});
+  if(!upcoming.length){
+    if(card)card.style.display='none';
+    return;
+  }
+  if(card)card.style.display='';
+  el.innerHTML=upcoming.map(function(f){
+    var diff=f.dueDay-today;
+    var isPaid=paid.indexOf(f.id)>-1;
+    var acc=D.accounts.find(function(a){return a.id===f.accountId;});
+    var accName=acc?acc.name:'';
+    /* Status pill */
+    var pill=isPaid
+      ?'<span style="background:var(--gbg);color:var(--green);font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px">✓ Paid</span>'
+      :diff===0
+        ?'<span style="background:var(--rbg);color:var(--red);font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px">Due TODAY</span>'
+        :diff<=2
+          ?'<span style="background:var(--abg);color:var(--amber);font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px">Due in '+diff+'d</span>'
+          :'<span style="background:var(--sur2);color:var(--tx3);font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px">Due '+f.dueDay+'th</span>';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bdr);gap:12px">'
+      +'<div style="display:flex;align-items:center;gap:10px;min-width:0">'
+        +'<div style="width:32px;height:32px;border-radius:8px;background:var(--rbg);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">📅</div>'
+        +'<div style="min-width:0">'
+          +'<div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name)+'</div>'
+          +'<div style="font-size:11px;color:var(--tx3);margin-top:1px">'
+            +f.freq
+            +(accName?' · <span style="background:var(--sur2);padding:1px 6px;border-radius:99px">🏦 '+esc(accName)+'</span>':'')
+          +'</div>'
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
+        +'<span style="font-family:monospace;font-size:14px;font-weight:600;color:var(--red)">'+fmt(f.amt)+'</span>'
+        +pill
+        +(!isPaid?'<button class="btn-ghost" style="font-size:11px;padding:2px 8px;margin-top:2px" onclick="togglePaid(\''+f.id+'\');renderUpcomingBills()">Mark paid</button>':'')
+      +'</div>'
+      +'</div>';
+  }).join('');
 }
 function renderBudgetBars(){
   var budgets=D.budgets,cats=Object.keys(budgets),el=document.getElementById('budgetBars');
@@ -4239,7 +4290,7 @@ function renderAll(){
   }
   var salDay=document.getElementById('salaryCreditDay');if(salDay&&D.config.salaryCreditDay)salDay.value=D.config.salaryCreditDay;
   renderAccounts();populateAccSel();populateTransferSelects();
-  if(document.getElementById('fixedSummary'))renderFixedSummary();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();autoLogFixed();
+  if(document.getElementById('fixedSummary'))renderFixedSummary();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();autoLogFixed();renderUpcomingBills();
   renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();populateLentAccSel();
   applyTheme(D.config.theme||'auto');applyFontSize(D.config.fontSize||'normal');updateLentBadge();renderLent();
   var incDt=document.getElementById('incDate');if(incDt)incDt.value=todayStr();
