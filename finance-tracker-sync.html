@@ -1077,8 +1077,9 @@ function loadFromFirebase(){
   });
 }
 function listenForChanges(){
+  var renderTimer=null;
   db.ref('finances/data').on('value',function(snap){
-    if(_isSaving)return; /* BUG FIX: skip if mid-save */
+    if(_isSaving)return;
     var val=snap.val();
     if(val){
       try{
@@ -1086,17 +1087,29 @@ function listenForChanges(){
         if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.occasions)fresh.occasions=[];if(!fresh.lent)fresh.lent=[];
         if(!fresh.liabilities)fresh.liabilities=[];
         if(!fresh.config)fresh.config={};if(!fresh.config.dailyLimit)fresh.config.dailyLimit=0;
-        if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;var _wasUnlocked=_incomeUnlocked;_incomeUnlocked=_wasUnlocked;renderAll();}
+        if(JSON.stringify(fresh)!==JSON.stringify(D)){
+          D=fresh;
+          /* Debounce rapid sync events — wait 300ms before re-rendering */
+          if(renderTimer)clearTimeout(renderTimer);
+          renderTimer=setTimeout(function(){
+            var wasUnlocked=_incomeUnlocked;
+            renderAll();
+            _incomeUnlocked=wasUnlocked;
+            applyIncomeLock();
+          },300);
+        }
       }catch(e){}
     }
   });
 }
+var _isDirty=false;
 function autoSave(){
   _isSaving=true;
-  cleanupPaidData(); /* BUG FIX */
+  _isDirty=true;
+  cleanupPaidData();
   setSyncStatus('syncing');
   if(saveTimer)clearTimeout(saveTimer);
-  saveTimer=setTimeout(function(){saveToFirebase();},2000);
+  saveTimer=setTimeout(function(){saveToFirebase();},3000);
 }
 function saveToFirebase(){
   if(!db)return;
@@ -1139,10 +1152,17 @@ function updateHeader(){
   if(btn)btn.style.display=isCurrentMonth?'none':'block';
 }
 function jumpToToday(){curDate=new Date();selDay=null;updateHeader();renderAll();}
+var _tabScrollPos={};
 function switchTab(n){
+  /* Save current tab scroll position */
+  var activeTab=document.querySelector('.tab-content.active');
+  if(activeTab)_tabScrollPos[activeTab.id]=window.scrollY;
   document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===n);});
   document.querySelectorAll('.tab-content').forEach(function(c){c.classList.toggle('active',c.id==='tab-'+n);});
   if(n==='history'){renderHistory();updateCharts();}if(n==='calendar')renderCalendar();if(n==='goals')renderGoals();if(n==='invest')renderInvestments();if(n==='networth')renderNetWorth();if(n==='lent')renderLent();if(n==='analyse')initAnalyse();
+  /* Restore scroll position for this tab */
+  var savedPos=_tabScrollPos['tab-'+n]||0;
+  setTimeout(function(){window.scrollTo(0,savedPos);},50);
 }
 function initAnalyse(){
   /* populate month dropdown */
@@ -2305,9 +2325,14 @@ function setChartMonth(offset,btn){
   updateCharts();
 }
 
+var _chartCacheKey='';
 function updateCharts(){
   var _chartDate=new Date(curDate.getFullYear(),curDate.getMonth()+(typeof _chartMonthOffset!=='undefined'?_chartMonthOffset:0),1);
   var exps=getExpenses(_chartDate),income=(D.config.income||0)+extraIncomeTotal(_chartDate),accs=D.accounts,fxd=fixedMonthly();
+  /* Cache key — only re-render if data actually changed */
+  var cacheKey=_chartDate.toISOString().slice(0,7)+'_'+exps.length+'_'+income+'_'+fxd+'_'+accs.length;
+  if(cacheKey===_chartCacheKey)return; /* skip if nothing changed */
+  _chartCacheKey=cacheKey;
   var spent=exps.reduce(function(s,e){return s+e.amt;},0),savA=Math.max(0,income-fxd-spent);
   var dark=matchMedia('(prefers-color-scheme:dark)').matches,gc=dark?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)';
   var cats={};exps.forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
