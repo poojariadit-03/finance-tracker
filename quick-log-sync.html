@@ -228,22 +228,34 @@ input[type=date]:focus{border-color:var(--green)}
 .ql-search-input:focus{border-color:var(--green)}
 .ql-search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--tx3);font-size:15px;pointer-events:none}
 
-/* Tablet and desktop layout */
+/* ── TABLET (600–900px) ── */
 @media(min-width:600px){
-  #app{max-width:480px;margin:0 auto;border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);min-height:100vh}
+  body{background:var(--sur2)}
+  #app{max-width:500px;margin:0 auto;border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);min-height:100vh}
   .header{padding:14px 20px}
   .content{padding:20px}
   .num-pad{max-width:380px;margin:0 auto}
-  .add-btn{font-size:18px;padding:18px}
+  .add-btn{font-size:17px;padding:16px}
   .cat-grid{grid-template-columns:repeat(4,1fr)}
   .mode-toggle{gap:8px}
   .mode-btn{padding:8px 16px;font-size:14px}
   .an-panel{padding:20px}
-  .an-stats-grid{grid-template-columns:repeat(4,1fr)}
+  .an-stats-grid{grid-template-columns:repeat(2,1fr)}
+  .month-bar{padding:10px 20px}
+  .exp-list{padding:0 4px}
 }
+/* ── DESKTOP (900px+) ── */
 @media(min-width:900px){
-  body{background:var(--sur2)}
-  #app{box-shadow:0 0 40px rgba(0,0,0,.1);border-radius:24px;margin-top:20px;margin-bottom:20px;min-height:auto}
+  #app{max-width:520px;border-radius:24px;margin-top:24px;margin-bottom:24px;min-height:auto;box-shadow:0 8px 40px rgba(0,0,0,.12);overflow:hidden}
+  .header{border-radius:24px 24px 0 0}
+  .cat-grid{grid-template-columns:repeat(4,1fr)}
+  .an-stats-grid{grid-template-columns:repeat(4,1fr)}
+  .num-pad{max-width:400px;margin:0 auto}
+}
+/* ── LARGE DESKTOP (1200px+) ── */
+@media(min-width:1200px){
+  body{display:flex;align-items:flex-start;justify-content:center;gap:32px;padding:24px}
+  #app{position:sticky;top:24px}
 }
 </style>
 </head>
