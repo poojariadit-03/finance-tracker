@@ -41,7 +41,11 @@ body{font-family:inherit;background:var(--bg);color:var(--tx);min-height:100vh;f
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-txt{font-size:14px;color:var(--tx2)}
 /* HEADER */
-header{background:var(--sur);border-bottom:1px solid var(--bdr);padding:.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;gap:10px;flex-wrap:wrap}
+header{background:var(--sur);border-bottom:1px solid var(--bdr);padding:.75rem 1.25rem;position:sticky;top:0;z-index:10}
+.hd-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hd-mnav{display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:var(--tx2);margin-top:8px}
+.hd-mnav button{background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--tx);font-size:15px;display:flex;align-items:center;justify-content:center}
+.hd-mnav button:hover{background:var(--bdr)}
 .hd-left{display:flex;align-items:center;gap:10px}
 header h1{font-size:15px;font-weight:600;white-space:nowrap}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;transition:background .3s}
@@ -149,24 +153,22 @@ input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:var(--bl
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 @media(max-width:640px){
   .two-col{grid-template-columns:1fr}
-  /* Header */
-  header{padding:.6rem 1rem;gap:6px;flex-wrap:nowrap}
-  header h1{font-size:13px}
-  .hd-left{gap:8px;min-width:0}
+  /* Header — clean 2 row layout */
+  header{padding:.6rem 1rem}
+  .hd-top{gap:6px}
+  header h1{font-size:13px;white-space:nowrap}
   .hd-right{gap:4px;flex-shrink:0}
   .hd-hide-sm{display:none!important}
   .hd-show-sm{display:flex!important}
-  .gsearch-wrap{display:none}
+  .hd-mnav{margin-top:6px;font-size:13px}
   .btn{padding:5px 10px;font-size:12px}
-  .theme-btn{width:30px;height:30px;font-size:14px}
-  /* Month nav */
-  .mnav{font-size:12px;gap:6px}
+  .theme-btn{width:30px;height:30px;font-size:14px;padding:0}
   /* Tabs */
   .tabs-wrap{padding:0 .5rem}
   .tab{padding:8px 9px;font-size:12px}
   /* Main */
   main{padding:.75rem .75rem 4rem}
-  /* Metric grid — 2x3 on mobile, TODAY SPENT full width */
+  /* Metric grid — 2 cols */
   .mgrid{grid-template-columns:repeat(2,1fr);gap:6px}
   .mgrid .metric:last-child:nth-child(odd){grid-column:1/-1}
   .mval{font-size:15px}
@@ -390,30 +392,31 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
 <!-- APP -->
 <div id="app" style="display:none">
 <header>
-  <div class="hd-left">
-    <h1>💰 Finance Tracker</h1>
-    <div class="sync-dot" id="syncDot"></div>
-    <span class="sync-label" id="syncLabel">Synced</span>
+  <div class="hd-top">
+    <div class="hd-left">
+      <h1>💰 Finance Tracker</h1>
+      <div class="sync-dot" id="syncDot"></div>
+      <span class="sync-label" id="syncLabel">Synced</span>
+    </div>
+    <div class="hd-right">
+      <div class="gsearch-wrap hd-hide-sm" id="gsearchWrap">
+        <input type="text" id="globalSearch" placeholder="🔍 Search…" oninput="doGlobalSearch(this.value)" onfocus="doGlobalSearch(this.value)" style="font-size:12px;padding:6px 10px" autocomplete="off">
+        <div class="gsearch-results" id="gsearchResults"></div>
+      </div>
+      <button class="btn export-btn hd-hide-sm" style="background:var(--blue)" onclick="openExportModal('report')">📊 Report</button>
+      <button class="btn export-btn hd-hide-sm" style="background:var(--green)" onclick="openExportModal('excel')">⬇ Excel</button>
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
+      <button class="theme-btn" id="incomeLockBtn" onclick="toggleIncomeLock()" title="Lock/Unlock income">🔒</button>
+      <button class="theme-btn hd-show-sm" onclick="toggleMobileMenu()" id="mobileMenuBtn">☰</button>
+      <button class="btn-ghost hd-hide-sm" onclick="disconnectFirebase()">⚙️ Setup</button>
+      <button class="btn-ghost hd-hide-sm" onclick="openSetPassword()">🔑 Password</button>
+    </div>
   </div>
-  <div class="mnav">
+  <div class="mnav hd-mnav">
     <button onclick="changeMonth(-1)">&#8249;</button>
     <span id="monthLabel" onclick="jumpToToday()" style="cursor:pointer" title="Click to go to current month">—</span>
     <button onclick="changeMonth(1)">&#8250;</button>
     <button id="todayNavBtn" onclick="jumpToToday()" style="display:none;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--gbg);color:var(--green);border-color:var(--green)">Today</button>
-  </div>
-  <div class="hd-right">
-    <div class="gsearch-wrap" id="gsearchWrap">
-      <input type="text" id="globalSearch" placeholder="🔍 Search…" oninput="doGlobalSearch(this.value)" onfocus="doGlobalSearch(this.value)" style="font-size:12px;padding:6px 10px" autocomplete="off">
-      <div class="gsearch-results" id="gsearchResults"></div>
-    </div>
-    <button class="btn export-btn hd-hide-sm" style="background:var(--blue)" onclick="openExportModal('report')">📊 Report</button>
-    <button class="btn export-btn hd-hide-sm" style="background:var(--green)" onclick="openExportModal('excel')">⬇ Excel</button>
-    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
-    <button class="theme-btn" id="incomeLockBtn" onclick="toggleIncomeLock()" title="Lock/Unlock income">🔒</button>
-    <!-- Mobile menu button -->
-    <button class="theme-btn hd-show-sm" onclick="toggleMobileMenu()" id="mobileMenuBtn">☰</button>
-    <button class="btn-ghost hd-hide-sm" onclick="disconnectFirebase()">⚙️ Setup</button>
-    <button class="btn-ghost hd-hide-sm" onclick="openSetPassword()">🔑 Password</button>
   </div>
   <!-- Mobile dropdown menu -->
   <div id="mobileMenu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;background:rgba(0,0,0,.5)" onclick="closeMobileMenu()">
