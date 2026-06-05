@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Quick Log">
+<meta name="theme-color" content="#1A1A18">
+<link rel="manifest" href="manifest.json">
 <title>Quick Log ₹</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -1478,6 +1482,17 @@ document.addEventListener('keydown',function(e){
     handleAdd();
   }
 });
+
+/* Register Service Worker for PWA/offline support */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      console.log('SW registered');
+    }).catch(function(e){
+      console.log('SW registration failed:',e);
+    });
+  });
+}
 </script>
 </body>
 </html>
