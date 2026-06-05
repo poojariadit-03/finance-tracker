@@ -474,7 +474,40 @@ function connectFirebase(){
   err.style.display='none';localStorage.setItem(FBKEY,JSON.stringify(cfg));initFirebase(cfg);
 }
 function initFirebase(cfg){
-  document.getElementById('setup').style.display='none';document.getElementById('loading').style.display='flex';
+  document.getElementById('setup').style.display='none';
+  document.getElementById('loading').style.display='flex';
+  /* If offline, try loading from cache directly */
+  if(!navigator.onLine){
+    var cached=loadFromCache();
+    if(cached){
+      D=cached;
+      if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];
+      if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];
+      if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.budgets)D.budgets={};
+      if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0}];
+      document.getElementById('loading').style.display='none';
+      document.getElementById('app').style.display='block';
+      updateOnlineBanner();
+      initUI();setSyncStatus('offline');
+      /* Try to connect Firebase in background when online */
+      window.addEventListener('online',function(){
+        try{
+          if(!firebase.apps.length)firebase.initializeApp(cfg);
+          db=firebase.database();
+          flushOfflineQueue();
+          /* Start live listener */
+          db.ref('finances/data').on('value',function(snap){
+            var v=snap.val();
+            if(v){try{var fresh=JSON.parse(v);if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;saveToCache();renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();}}catch(e){}}
+          });
+        }catch(e){}
+      },{once:true});
+      return;
+    } else {
+      document.getElementById('loadingTxt').textContent='You are offline and no cached data found. Please connect to internet first.';
+      return;
+    }
+  }
   try{if(!firebase.apps.length)firebase.initializeApp(cfg);db=firebase.database();loadFromFirebase();}
   catch(e){document.getElementById('loading').style.display='none';document.getElementById('setup').style.display='flex';document.getElementById('setupErr').textContent='Connection failed: '+e.message;document.getElementById('setupErr').style.display='block';localStorage.removeItem(FBKEY);}
 }
