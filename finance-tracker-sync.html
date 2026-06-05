@@ -43,7 +43,7 @@ body{font-family:inherit;background:var(--bg);color:var(--tx);min-height:100vh;f
 /* HEADER */
 header{background:var(--sur);border-bottom:1px solid var(--bdr);padding:.75rem 1.25rem;position:sticky;top:0;z-index:10}
 .hd-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.hd-mnav{display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:var(--tx2);margin-top:8px}
+.hd-mnav{display:none;align-items:center;justify-content:center;gap:8px;font-size:13px;color:var(--tx2);margin-top:6px;padding-bottom:2px}
 .hd-mnav button{background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--tx);font-size:15px;display:flex;align-items:center;justify-content:center}
 .hd-mnav button:hover{background:var(--bdr)}
 .hd-left{display:flex;align-items:center;gap:10px}
@@ -159,7 +159,9 @@ input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:var(--bl
   .mgrid{grid-template-columns:repeat(3,1fr);gap:8px}
   .agrid{grid-template-columns:repeat(2,1fr)}
   .wk-grid{grid-template-columns:repeat(2,1fr)}
-  .gsearch-wrap{max-width:180px}
+  /* Hide search and text buttons on tablet too */
+  .gsearch-wrap{display:none!important}
+  .btn-ghost{display:none!important}
 }
 
 /* ── MOBILE (< 480px) ── */
@@ -172,7 +174,7 @@ input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:var(--bl
   .hd-right{gap:3px}
   .hd-hide-sm{display:none!important}
   .hd-show-sm{display:flex!important}
-  .hd-mnav{margin-top:5px;padding-bottom:2px}
+  .hd-mnav{display:flex;margin-top:5px;padding-bottom:2px}
   .btn{padding:5px 9px;font-size:12px}
   .theme-btn{width:28px;height:28px;font-size:13px;padding:0}
   /* Tabs */
@@ -422,6 +424,12 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <div class="sync-dot" id="syncDot"></div>
       <span class="sync-label" id="syncLabel">Synced</span>
     </div>
+    <div class="mnav hd-hide-sm">
+      <button onclick="changeMonth(-1)">&#8249;</button>
+      <span id="monthLabel" onclick="jumpToToday()" style="cursor:pointer;min-width:80px;text-align:center" title="Click to go to current month">—</span>
+      <button onclick="changeMonth(1)">&#8250;</button>
+      <button id="todayNavBtn" onclick="jumpToToday()" style="display:none;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--gbg);color:var(--green);border-color:var(--green)">Today</button>
+    </div>
     <div class="hd-right">
       <div class="gsearch-wrap hd-hide-sm" id="gsearchWrap">
         <input type="text" id="globalSearch" placeholder="🔍 Search…" oninput="doGlobalSearch(this.value)" onfocus="doGlobalSearch(this.value)" style="font-size:12px;padding:6px 10px" autocomplete="off">
@@ -436,11 +444,11 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <button class="btn-ghost hd-hide-sm" onclick="openSetPassword()">🔑 Password</button>
     </div>
   </div>
-  <div class="mnav hd-mnav">
+  <!-- Mobile only month nav -->
+  <div class="hd-mnav">
     <button onclick="changeMonth(-1)">&#8249;</button>
-    <span id="monthLabel" onclick="jumpToToday()" style="cursor:pointer" title="Click to go to current month">—</span>
+    <span id="monthLabelMob" onclick="jumpToToday()" style="cursor:pointer;min-width:80px;text-align:center">—</span>
     <button onclick="changeMonth(1)">&#8250;</button>
-    <button id="todayNavBtn" onclick="jumpToToday()" style="display:none;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--gbg);color:var(--green);border-color:var(--green)">Today</button>
   </div>
   <!-- Mobile dropdown menu -->
   <div id="mobileMenu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;background:rgba(0,0,0,.5)" onclick="closeMobileMenu()">
@@ -1246,7 +1254,9 @@ function changeMonth(dir){
   document.querySelectorAll('.qpill').forEach(function(p){p.classList.remove('active');});
   var first=document.querySelector('.qpill');if(first)first.classList.add('active');curDate=new Date(curDate.getFullYear(),curDate.getMonth()+dir,1);selDay=null;_qFilterMode='all';var pills=document.querySelectorAll('.qpill');if(pills.length){pills.forEach(function(p){p.classList.remove('active');});pills[0].classList.add('active');}updateHeader();renderAll();}
 function updateHeader(){
-  document.getElementById('monthLabel').textContent=curDate.toLocaleString('default',{month:'short',year:'numeric'});
+  var ml=curDate.toLocaleString('default',{month:'short',year:'numeric'});
+  document.getElementById('monthLabel').textContent=ml;
+  var mob=document.getElementById('monthLabelMob');if(mob)mob.textContent=ml;
   var now=new Date();
   var isCurrentMonth=curDate.getFullYear()===now.getFullYear()&&curDate.getMonth()===now.getMonth();
   var btn=document.getElementById('todayNavBtn');
