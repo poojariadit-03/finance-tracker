@@ -3957,7 +3957,17 @@ function checkDueDayAutoPay(){
   if(autoPaidCount>0){D.paid[m]=paid;autoSave();renderFixed();renderExpenses();recalc();showToast(autoPaidCount+' fixed expense'+(autoPaidCount>1?'s':'')+' auto-paid today!','success');}
 }
 
-function initDefaults(){if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];}
+function initDefaults(){
+  if(!D.accounts)D.accounts=[];
+  if(!D.expenses)D.expenses=[];
+  if(!D.fixed)D.fixed=[];
+  if(!D.goals)D.goals=[];
+  if(!D.lent)D.lent=[];
+  if(!D.transfers)D.transfers=[];
+  if(!D.extraIncome)D.extraIncome=[];
+  if(!D.budgets)D.budgets={};
+  if(!D.config)D.config={income:0,savpct:20,theme:'auto',fontSize:'normal',dailyLimit:0};
+}
 function renderAll(){
   var income=D.config.income||0,pct=D.config.savpct||20;
   var locked=hasIncomePassword()&&!_incomeUnlocked;
