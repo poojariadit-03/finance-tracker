@@ -49,9 +49,10 @@ html,body{height:100%;font-family:-apple-system,'SF Pro Display','Segoe UI',sans
 .an-section{display:none}.an-section.show{display:block}
 .an-filter{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
 .an-filter select{background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none;width:100%}
-.an-mcard{background:var(--sur2);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
-.an-mlabel{font-size:12px;color:var(--tx3)}
-.an-mval{font-size:18px;font-weight:700}
+.an-mcard{background:var(--sur2);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.an-mlabel{font-size:11px;color:var(--tx3);text-transform:uppercase;font-weight:500;letter-spacing:.04em}
+.an-mval{font-size:20px;font-weight:600}
+.an-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .an-day-card{background:var(--sur);border-radius:12px;padding:12px 14px;margin-bottom:8px}
 .an-day-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .an-day-name{font-size:14px;font-weight:600}
@@ -273,7 +274,7 @@ input[type=date]:focus{border-color:var(--green)}
       <button style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;color:var(--tx2);font-size:12px;font-weight:600;cursor:pointer;padding:5px 10px;font-family:inherit" onclick="toggleAnalyse()">📊</button>
     </div>
   </div>
-  <div class="month-bar">
+  <div class="month-bar" id="monthBar">
     <div class="month-bar-top">
       <span class="month-bar-label" id="monthBarLabel">This month</span>
       <span><span class="month-bar-inc" id="monthBarInc"></span><span class="month-bar-val" id="monthBarVal"></span></span>
@@ -396,11 +397,12 @@ input[type=date]:focus{border-color:var(--green)}
     <button onclick="toggleAnalyse()" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--tx2);cursor:pointer;font-family:inherit">← Back</button>
   </div>
   <div class="an-filter">
-    <select id="an-month"></select>
-    <select id="an-cat"><option value="">All categories</option><option>Food</option><option>Transport</option><option>Shopping</option><option>Health</option><option>Entertainment</option><option>Utilities</option><option>Education</option><option>Other</option></select>
-    <select id="an-acc"><option value="">All accounts</option></select>
-    <input type="text" id="an-search" placeholder="Search expenses..." style="background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none;width:100%">
-    <button class="add-btn" style="margin-bottom:0;padding:12px;font-size:15px" onclick="renderQLAnalyse()">Apply filters</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <select id="an-month" onchange="renderQLAnalyse()"></select>
+      <select id="an-cat" onchange="renderQLAnalyse()"><option value="">All categories</option><option>Food</option><option>Transport</option><option>Shopping</option><option>Health</option><option>Entertainment</option><option>Utilities</option><option>Education</option><option>Other</option></select>
+    </div>
+    <select id="an-acc" onchange="renderQLAnalyse()"><option value="">All accounts</option></select>
+    <input type="text" id="an-search" placeholder="🔍 Search expenses..." oninput="renderQLAnalyse()" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none;width:100%">
   </div>
   <div class="an-pills">
     <button class="an-pill active" onclick="switchAnPill('summary',this)">Summary</button>
@@ -1329,9 +1331,11 @@ function exportQLAnalyseCSV(){
 }
 function toggleAnalyse(){
   var p=document.getElementById('anPanel'),content=document.getElementById('qlContent');
+  var monthBar=document.getElementById('monthBar');
   var open=p.classList.contains('show');
   p.classList.toggle('show',!open);
   if(content)content.style.display=open?'block':'none';
+  if(monthBar)monthBar.style.display=open?'':'none';
   if(!open)initQLAnalyse();
 }
 function switchAnPill(sec,btn){
@@ -1393,14 +1397,16 @@ function renderQLAnalyse(){
     var hasExp=D.expenses.some(function(e){return e.month===ndM&&e.date&&e.date.slice(0,10)===ndKey;});
     if(!hasExp)noSpendStreak++;else break;
   }
-  var streakHtml=noSpendStreak>=2?'<div class="an-mcard"><span class="an-mlabel">No-spend streak</span><span class="an-mval" style="color:var(--green);font-size:15px">🎯 '+noSpendStreak+' days</span></div>':'';
+  var streakHtml=noSpendStreak>=2?'<div class="an-mcard" style="grid-column:1/-1"><span class="an-mlabel">No-spend streak</span><span class="an-mval" style="color:var(--green)">🎯 '+noSpendStreak+' days</span></div>':'';
   /* Summary metrics */
   document.getElementById('an-metrics').innerHTML=
+    '<div class="an-stats-grid">'+
     '<div class="an-mcard"><span class="an-mlabel">Total spent</span><span class="an-mval" style="color:var(--red)">'+fmt(total)+'</span></div>'+
     '<div class="an-mcard"><span class="an-mlabel">Avg / day</span><span class="an-mval">'+fmt(Math.round(avg))+'</span></div>'+
     '<div class="an-mcard"><span class="an-mlabel">Transactions</span><span class="an-mval" style="color:var(--blue)">'+exps.length+'</span></div>'+
-    '<div class="an-mcard"><span class="an-mlabel">Top category</span><span class="an-mval" style="font-size:15px;color:var(--green)">'+topCat+'</span></div>'+
-    streakHtml;
+    '<div class="an-mcard"><span class="an-mlabel">Top category</span><span class="an-mval" style="font-size:16px;color:var(--green)">'+topCat+'</span></div>'+
+    streakHtml+
+    '</div>';
   /* Categories */
   var sortedCats=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];});
   document.getElementById('an-cats').innerHTML='<div style="margin-bottom:14px">'+sortedCats.map(function(k){
