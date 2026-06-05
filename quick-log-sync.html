@@ -231,36 +231,36 @@ input[type=date]:focus{border-color:var(--green)}
 /* ── TABLET (600–900px) ── */
 @media(min-width:600px){
   body{background:var(--sur2)}
-  #app{max-width:500px;margin:0 auto;border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);min-height:100vh}
+  #app{max-width:600px;margin:0 auto;border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);min-height:100vh}
   .header{padding:14px 20px}
   .content{padding:20px}
   .num-pad{max-width:380px;margin:0 auto}
   .add-btn{font-size:17px;padding:16px}
   .cat-grid{grid-template-columns:repeat(4,1fr)}
-  .mode-toggle{gap:8px}
-  .mode-btn{padding:8px 16px;font-size:14px}
   .an-panel{padding:20px}
   .an-stats-grid{grid-template-columns:repeat(2,1fr)}
   .month-bar{padding:10px 20px}
-  .exp-list{padding:0 4px}
 }
-/* ── DESKTOP (900px+) ── left panel + right panel */
+/* ── DESKTOP (900px+) ── full width like FT */
 @media(min-width:900px){
-  body{background:var(--sur2);display:grid;grid-template-columns:480px 1fr;min-height:100vh;gap:0;align-items:start}
-  #app{max-width:480px;border-right:1px solid var(--bdr);border-left:none;border-radius:0;min-height:100vh;position:sticky;top:0;height:100vh;overflow-y:auto}
+  body{background:var(--sur2)}
+  #app{max-width:960px;margin:0 auto;border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);min-height:100vh}
+  .cat-grid{grid-template-columns:repeat(6,1fr)}
   .an-stats-grid{grid-template-columns:repeat(4,1fr)}
-  .num-pad{max-width:420px;margin:0 auto}
-  #qlDesktopPanel{display:block!important;padding:32px 28px;overflow-y:auto;height:100vh;position:sticky;top:0;background:var(--sur2)}
-  #qlDesktopPanel::-webkit-scrollbar{width:4px}
-  #qlDesktopPanel::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:99px}
+  .content{padding:24px 32px}
+  .header{padding:14px 32px}
+  .month-bar{padding:10px 32px}
+  .an-panel{padding:24px 32px}
 }
 @media(max-width:899px){
   #qlDesktopPanel{display:none!important}
 }
-/* ── LARGE DESKTOP (1200px+) ── */
-@media(min-width:1200px){
-  body{grid-template-columns:520px 1fr}
-  #app{max-width:520px}
+@media(min-width:900px){
+  #qlDesktopPanel{display:none!important}
+}
+/* ── LARGE DESKTOP (1280px+) ── */
+@media(min-width:1280px){
+  #app{max-width:1100px}
 }
 </style>
 </head>
