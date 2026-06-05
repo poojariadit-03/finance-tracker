@@ -254,7 +254,10 @@ input[type=date]:focus{border-color:var(--green)}
   #qlDesktopPanel{display:block;padding:24px;overflow-y:auto;height:100vh;position:sticky;top:0}
 }
 @media(max-width:899px){
-  #qlDesktopPanel{display:none}
+  #qlDesktopPanel{display:none!important}
+}
+@media(min-width:900px){
+  #qlDesktopPanel{display:block!important}
 }
 /* ── LARGE DESKTOP (1200px+) ── */
 @media(min-width:1200px){
@@ -425,7 +428,7 @@ input[type=date]:focus{border-color:var(--green)}
   </div>
 </div>
 <!-- Desktop right panel — expense history -->
-<div id="qlDesktopPanel" style="display:none">
+<div id="qlDesktopPanel">
   <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:var(--tx)">⚡ Expense History</div>
   <div id="qlDesktopList" style="color:var(--tx2);font-size:13px">Loading...</div>
 </div>
@@ -801,7 +804,7 @@ function initUI(){
   document.getElementById('dailyLimitInput').value=savedLimit;
   /* Sync theme from Firebase D.config */
   if(D.config&&D.config.theme){applyQLTheme(D.config.theme);}
-  renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();renderQLScore();updateCopyLast();updateLentAlertQL();
+  renderCats();renderIncSources();renderAccs();renderOccasions();renderList();renderMonthBar();renderQLScore();updateCopyLast();updateLentAlertQL();renderQLDesktopPanel();
 }
 function applyQLTheme(t){
   document.body.classList.remove('force-light','force-dark');
