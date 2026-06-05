@@ -488,7 +488,7 @@ function initFirebase(cfg){
       if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];
       if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];
       if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.budgets)D.budgets={};
-      if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0}];
+      if(!D.accounts)D.accounts=[];
       document.getElementById('loading').style.display='none';
       document.getElementById('app').style.display='block';
       updateOnlineBanner();
@@ -568,7 +568,7 @@ function loadFromFirebase(){
     if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];
     if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];
     if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];if(!D.budgets)D.budgets={};
-    if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];
+    if(!D.accounts)D.accounts=[];
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='block';
     initUI();setSyncStatus('synced');
@@ -590,7 +590,7 @@ function loadFromFirebase(){
         saveToCache();
       }catch(e){}
     }
-    if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];
+    if(!D.accounts)D.accounts=[];
     if(!cached){
       document.getElementById('loading').style.display='none';
       document.getElementById('app').style.display='block';
