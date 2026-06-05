@@ -1736,14 +1736,7 @@ function renderAccounts(){
   var accs=D.accounts,grid=document.getElementById('accountGrid');
   if(!accs.length){grid.innerHTML='<p class="empty" style="margin-bottom:1rem">No accounts yet.</p>';return;}
   /* Total balance summary */
-  var totalBal=accs.reduce(function(s,a,i){
-    var sp=D.expenses.filter(function(e){return e.accountId===a.id;}).reduce(function(t,e){return t+e.amt;},0);
-    var inc=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(t,e){return t+e.amt;},0);
-    var tIn=(D.transfers||[]).filter(function(t){return t.toId===a.id;}).reduce(function(t2,t){return t2+t.amt;},0);
-    var tOut=(D.transfers||[]).filter(function(t){return t.fromId===a.id;}).reduce(function(t2,t){return t2+t.amt;},0);
-    var sal=getSalaryCredits(a.id);
-    return s+(a.openingBalance+inc+sal+tIn-tOut-sp);
-  },0);
+  var totalBal=accs.reduce(function(s,a){return s+getAccountBalance(a.id);},0);
   var totalEl=document.getElementById('accTotalBal');
   if(totalEl){totalEl.textContent=fmt(totalBal);totalEl.style.color=totalBal>=0?'var(--green)':'var(--red)';}
   /* Low balance check */
@@ -1762,10 +1755,11 @@ function renderAccounts(){
     if(lowAlerts.length){lowBanner.style.display='flex';document.getElementById('lowBalanceText').textContent='⚠️ Low balance: '+lowAlerts.join(', ');}
     else lowBanner.style.display='none';
   }
-  grid.innerHTML=accs.map(function(a,i){var spent=D.expenses.filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
-    var incIn=(D.extraIncome||[]).filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
+  grid.innerHTML=accs.map(function(a,i){
+    var bal=getAccountBalance(a.id);
+    var spent=D.expenses.filter(function(e){return e.accountId===a.id;}).reduce(function(s,e){return s+e.amt;},0);
     var sal=getSalaryCredits(a.id);
-    var tIn=(D.transfers||[]).filter(function(t){return t.toId===a.id;}).reduce(function(s,t){return s+t.amt;},0);var tOut=(D.transfers||[]).filter(function(t){return t.fromId===a.id;}).reduce(function(s,t){return s+t.amt;},0);var bal=a.openingBalance+incIn+sal+tIn-tOut-spent,c=AC[i%AC.length];var utilHtml='';
+    var c=AC[i%AC.length];var utilHtml='';
     if(a.type==='Credit Card'&&a.creditLimit>0){
       var util=Math.min(100,Math.abs(bal)/a.creditLimit*100);
       var utilCol=util>=80?'var(--red)':util>=50?'var(--amber)':'var(--green)';
@@ -3084,8 +3078,13 @@ function simpleHash(str){
   return Math.abs(hash).toString(16);
 }
 async function sha256(str){
-  var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+  try{
+    var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+  }catch(e){
+    /* Fallback to simpleHash if crypto.subtle not available */
+    return simpleHash(str);
+  }
 }
 function hasIncomePassword(){
   return !!(D.config.incomePasswordHash);
@@ -3368,6 +3367,21 @@ function exportReport(months){
 
 /* ═══ LENT MONEY TRACKER ═══ */
 /* ═══ LENT — PHASE 1 ═══ */
+/* ═══ XSS SANITIZATION ═══ */
+function esc(str){
+  if(!str)return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function getAccountBalance(accountId){
+  var spent=D.expenses.filter(function(e){return e.accountId===accountId;}).reduce(function(s,e){return s+e.amt;},0);
+  var incIn=(D.extraIncome||[]).filter(function(e){return e.accountId===accountId;}).reduce(function(s,e){return s+e.amt;},0);
+  var tIn=(D.transfers||[]).filter(function(t){return t.toId===accountId;}).reduce(function(s,t){return s+t.amt;},0);
+  var tOut=(D.transfers||[]).filter(function(t){return t.fromId===accountId;}).reduce(function(s,t){return s+t.amt;},0);
+  var sal=getSalaryCredits(accountId);
+  var acc=D.accounts.find(function(a){return a.id===accountId;});
+  if(!acc)return 0;
+  return acc.openingBalance+incIn+sal+tIn-tOut-spent;
+}
 function populateLentAccSel(){
   var sel=document.getElementById('lentFromAcc');
   if(!sel)return;
