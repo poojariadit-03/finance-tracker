@@ -252,6 +252,9 @@ input[type=date]:focus{border-color:var(--green)}
   <div class="spinner"></div>
   <div class="loading-txt" id="loadingTxt">Connecting...</div>
 </div>
+<div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:999;background:#D85A30;color:#fff;padding:8px 16px;font-size:13px;font-weight:600;align-items:center;justify-content:center;gap:8px">
+  📡 Offline — expenses saved locally, will sync when reconnected
+</div>
 
 <!-- APP -->
 <div id="app">
@@ -476,16 +479,112 @@ function initFirebase(cfg){
   catch(e){document.getElementById('loading').style.display='none';document.getElementById('setup').style.display='flex';document.getElementById('setupErr').textContent='Connection failed: '+e.message;document.getElementById('setupErr').style.display='block';localStorage.removeItem(FBKEY);}
 }
 function disconnectFirebase(){if(!confirm('Disconnect?'))return;localStorage.removeItem(FBKEY);location.reload();}
+var _offlineQueue=[];
+var _isOnline=navigator.onLine;
+var LS_CACHE='ft_ql_cache';
+
+/* Online/offline detection */
+window.addEventListener('online',function(){
+  _isOnline=true;
+  updateOnlineBanner();
+  /* Flush queued saves */
+  if(_offlineQueue.length&&db){
+    showToast('Back online — syncing '+_offlineQueue.length+' item(s)...','info');
+    flushOfflineQueue();
+  }
+});
+window.addEventListener('offline',function(){
+  _isOnline=false;
+  updateOnlineBanner();
+  showToast('You are offline — expenses will sync when reconnected','info');
+});
+function updateOnlineBanner(){
+  var b=document.getElementById('offlineBanner');
+  if(b)b.style.display=_isOnline?'none':'flex';
+}
+function flushOfflineQueue(){
+  if(!_offlineQueue.length||!db)return;
+  db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+    _offlineQueue=[];
+    setSyncStatus('synced');
+  }).catch(function(){
+    setSyncStatus('error');
+  });
+}
+function saveToCache(){
+  try{localStorage.setItem(LS_CACHE,JSON.stringify(D));}catch(e){}
+}
+function loadFromCache(){
+  try{
+    var cached=localStorage.getItem(LS_CACHE);
+    if(cached){var d=JSON.parse(cached);return d;}
+  }catch(e){}
+  return null;
+}
+
 function loadFromFirebase(){
   document.getElementById('loadingTxt').textContent='Loading your data...';
+  /* Try loading from cache first for instant start */
+  var cached=loadFromCache();
+  if(cached){
+    D=cached;
+    if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];
+    if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];
+    if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];if(!D.budgets)D.budgets={};
+    if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];
+    document.getElementById('loading').style.display='none';
+    document.getElementById('app').style.display='block';
+    initUI();setSyncStatus('synced');
+  }
+  if(!_isOnline){
+    if(!cached){
+      document.getElementById('loadingTxt').textContent='You are offline and no cached data found. Please connect to internet.';
+    }
+    return;
+  }
   db.ref('finances/data').once('value').then(function(snap){
     var val=snap.val();
-    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];if(!D.budgets)D.budgets={};}catch(e){}}
+    if(val){
+      try{
+        var ld=JSON.parse(val);D=ld;
+        if(!D.extraIncome)D.extraIncome=[];if(!D.customCategories)D.customCategories=[];
+        if(!D.occasions)D.occasions=[];if(!D.liabilities)D.liabilities=[];
+        if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];if(!D.budgets)D.budgets={};
+        saveToCache();
+      }catch(e){}
+    }
     if(!D.accounts||!D.accounts.length)D.accounts=[{id:'cash',name:'Cash',type:'Cash',openingBalance:0},{id:'bank',name:'Bank Account',type:'Bank Account',openingBalance:0},{id:'upi',name:'UPI',type:'UPI',openingBalance:0}];
-    document.getElementById('loading').style.display='none';document.getElementById('app').style.display='block';
-    initUI();setSyncStatus('synced');
-    db.ref('finances/data').on('value',function(snap){var v=snap.val();if(v){try{var fresh=JSON.parse(v);if(!fresh.extraIncome)fresh.extraIncome=[];if(!fresh.customCategories)fresh.customCategories=[];if(!fresh.occasions)fresh.occasions=[];if(!fresh.liabilities)fresh.liabilities=[];if(!fresh.lent)fresh.lent=[];if(!fresh.transfers)fresh.transfers=[];if(!fresh.budgets)fresh.budgets={};if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();}}catch(e){}}});
-  }).catch(function(e){document.getElementById('loadingTxt').textContent='Error: '+e.message;});
+    if(!cached){
+      document.getElementById('loading').style.display='none';
+      document.getElementById('app').style.display='block';
+      initUI();
+    } else {
+      /* Refresh UI with fresh data */
+      renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();
+    }
+    setSyncStatus('synced');
+    /* Listen for live changes */
+    db.ref('finances/data').on('value',function(snap){
+      var v=snap.val();
+      if(v){
+        try{
+          var fresh=JSON.parse(v);
+          if(!fresh.extraIncome)fresh.extraIncome=[];if(!fresh.customCategories)fresh.customCategories=[];
+          if(!fresh.occasions)fresh.occasions=[];if(!fresh.liabilities)fresh.liabilities=[];
+          if(!fresh.lent)fresh.lent=[];if(!fresh.transfers)fresh.transfers=[];if(!fresh.budgets)fresh.budgets={};
+          if(JSON.stringify(fresh)!==JSON.stringify(D)){
+            D=fresh;saveToCache();
+            renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();
+          }
+        }catch(e){}
+      }
+    });
+  }).catch(function(e){
+    if(!cached){
+      document.getElementById('loadingTxt').textContent='Error loading: '+e.message;
+    }
+    setSyncStatus('error');
+  });
 }
 
 /* ═══ FINANCIAL HEALTH SCORE (quick-log) ═══ */
@@ -585,8 +684,26 @@ function showToast(msg,type){
   if(toastTimer)clearTimeout(toastTimer);
   toastTimer=setTimeout(function(){t.classList.remove('show');},3000);
 }
-function autoSave(){setSyncStatus('syncing');if(saveTimer)clearTimeout(saveTimer);saveTimer=setTimeout(function(){db.ref('finances/data').set(JSON.stringify(D)).then(function(){setSyncStatus('synced');}).catch(function(){setSyncStatus('error');});},2000);}
-function setSyncStatus(s){var dot=document.getElementById('syncDot'),lbl=document.getElementById('syncLabel');if(!dot)return;dot.className='sync-dot'+(s==='syncing'?' syncing':s==='error'?' error':'');lbl.textContent=s==='syncing'?'Syncing...':s==='error'?'Error':'Synced';}
+function autoSave(){
+  saveToCache(); /* Always save to cache immediately */
+  setSyncStatus('syncing');
+  if(saveTimer)clearTimeout(saveTimer);
+  if(!_isOnline){
+    _offlineQueue.push(Date.now());
+    setSyncStatus('offline');
+    return;
+  }
+  saveTimer=setTimeout(function(){
+    db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+      setSyncStatus('synced');
+      _offlineQueue=[];
+    }).catch(function(){
+      setSyncStatus('error');
+      _offlineQueue.push(Date.now());
+    });
+  },2000);
+}
+function setSyncStatus(s){var dot=document.getElementById('syncDot'),lbl=document.getElementById('syncLabel');if(!dot)return;dot.className='sync-dot'+(s==='syncing'?' syncing':s==='error'?' error':s==='offline'?' error':'');lbl.textContent=s==='syncing'?'Syncing...':s==='error'?'Error':s==='offline'?'Offline':'Synced';}
 
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function mk(d){var t=d||new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');}
