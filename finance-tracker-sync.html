@@ -3051,33 +3051,37 @@ function checkAutoContribs(){
 /* ═══ INCOME PASSWORD PROTECTION ═══ */
 var _incomeUnlocked=false;
 
+/* ═══ SHA-256 PASSWORD HASHING ═══ */
 function simpleHash(str){
-  /* Simple hash — not cryptographic but good enough for this use case */
+  /* Legacy hash — kept for migration only */
   var hash=0;
   for(var i=0;i<str.length;i++){hash=((hash<<5)-hash)+str.charCodeAt(i);hash=hash&hash;}
   return Math.abs(hash).toString(16);
 }
-
+async function sha256(str){
+  var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+}
 function hasIncomePassword(){
   return !!(D.config.incomePasswordHash);
+}
+function isLegacyHash(hash){
+  /* Legacy hashes are short hex strings (<=8 chars), SHA-256 are 64 chars */
+  return hash&&hash.length<=8;
 }
 
 function toggleIncomeLock(){
   if(!hasIncomePassword()){
-    /* No password set yet — open set password modal */
     openSetPassword();
     return;
   }
   if(_incomeUnlocked){
-    /* Lock it */
     _incomeUnlocked=false;
     applyIncomeLock();
     showToast('Income data locked 🔒','info');
   } else {
-    /* Unlock — show password modal */
     document.getElementById('unlockPasswordInput').value='';
     document.getElementById('unlockError').style.display='none';
-    /* Show hint if set */
     var hint=D.config.incomePasswordHint||'';
     var hintRow=document.getElementById('unlockHintRow');
     var hintText=document.getElementById('unlockHintText');
@@ -3088,11 +3092,24 @@ function toggleIncomeLock(){
   }
 }
 
-function verifyIncomePassword(){
+async function verifyIncomePassword(){
   var input=document.getElementById('unlockPasswordInput').value;
   if(!input){showToast('Enter password','error');return;}
-  var hash=simpleHash(input);
-  if(hash===D.config.incomePasswordHash){
+  var stored=D.config.incomePasswordHash;
+  var match=false;
+  if(isLegacyHash(stored)){
+    /* Legacy hash — verify with simpleHash then migrate to SHA-256 */
+    if(simpleHash(input)===stored){
+      match=true;
+      /* Migrate to SHA-256 */
+      D.config.incomePasswordHash=await sha256(input);
+      autoSave();
+    }
+  } else {
+    /* SHA-256 hash */
+    match=(await sha256(input))===stored;
+  }
+  if(match){
     _incomeUnlocked=true;
     document.getElementById('incomeUnlockModal').classList.remove('show');
     applyIncomeLock();
@@ -3117,7 +3134,7 @@ function openSetPassword(){
   document.getElementById('incomeSetPasswordModal').classList.add('show');
 }
 
-function saveIncomePassword(){
+async function saveIncomePassword(){
   var errEl=document.getElementById('setPwdError');
   errEl.style.display='none';
   var hasPass=hasIncomePassword();
@@ -3125,16 +3142,18 @@ function saveIncomePassword(){
   if(hasPass){
     var oldInput=document.getElementById('oldPasswordInput').value;
     if(!oldInput){errEl.textContent='Enter current password';errEl.style.display='block';return;}
-    if(simpleHash(oldInput)!==D.config.incomePasswordHash){errEl.textContent='Current password is wrong';errEl.style.display='block';return;}
+    var stored=D.config.incomePasswordHash;
+    var oldMatch=isLegacyHash(stored)?(simpleHash(oldInput)===stored):((await sha256(oldInput))===stored);
+    if(!oldMatch){errEl.textContent='Current password is wrong';errEl.style.display='block';return;}
   }
   var newPass=document.getElementById('newPasswordInput').value;
   var confirmPass=document.getElementById('confirmPasswordInput').value;
   if(!newPass||newPass.length<4){errEl.textContent='Password must be at least 4 characters';errEl.style.display='block';return;}
   if(newPass!==confirmPass){errEl.textContent='Passwords do not match';errEl.style.display='block';return;}
-  D.config.incomePasswordHash=simpleHash(newPass);
+  D.config.incomePasswordHash=await sha256(newPass);
   D.config.incomePasswordHint=document.getElementById('passwordHintInput').value.trim();
   autoSave();
-  _incomeUnlocked=true; /* unlock after setting */
+  _incomeUnlocked=true;
   document.getElementById('incomeSetPasswordModal').classList.remove('show');
   applyIncomeLock();
   showToast(hasPass?'Password changed ✓':'Income password set ✓','success');
