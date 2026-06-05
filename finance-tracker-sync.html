@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Finance Tracker ₹</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -144,7 +146,55 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .chkrow{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tx2);white-space:nowrap;cursor:pointer}
 input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:var(--blue)}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-@media(max-width:640px){.two-col{grid-template-columns:1fr}}
+@media(max-width:640px){
+  .two-col{grid-template-columns:1fr}
+  /* Header */
+  header{padding:.6rem 1rem;gap:6px}
+  header h1{font-size:13px}
+  .hd-right{gap:4px;flex-wrap:wrap}
+  .btn{padding:5px 10px;font-size:12px}
+  .btn-ghost{padding:4px 8px;font-size:11px}
+  .theme-btn{width:28px;height:28px;font-size:13px}
+  /* Month nav */
+  .mnav{font-size:12px;gap:6px}
+  /* Tabs */
+  .tabs-wrap{padding:0 .75rem}
+  .tab{padding:8px 10px;font-size:12px}
+  /* Main */
+  main{padding:.75rem .75rem 4rem}
+  /* Metric grid — 2 cols on mobile */
+  .mgrid{grid-template-columns:repeat(2,1fr);gap:6px}
+  .mval{font-size:15px}
+  .metric{padding:.6rem .8rem}
+  /* Cards */
+  .card{padding:.85rem 1rem}
+  /* Input rows */
+  .irow{flex-direction:column;gap:6px}
+  .irow input,.irow select,.irow button{width:100%!important;max-width:100%!important}
+  .srow{flex-wrap:wrap}
+  .srow label{min-width:auto;width:100%}
+  /* Lent items */
+  .lent-item{flex-direction:column;gap:8px}
+  .lent-right{flex-direction:row;justify-content:space-between;width:100%}
+  /* Account grid */
+  .agrid{grid-template-columns:repeat(2,1fr)}
+  /* Goals grid */
+  .gcards{grid-template-columns:1fr}
+  /* Health score bars */
+  .bars{grid-template-columns:1fr}
+  /* Modal */
+  .modal-box{margin:10px;max-width:calc(100vw - 20px)!important;max-height:90vh;overflow-y:auto}
+  /* Quick setup */
+  .irow input[type=text]{flex:none;width:100%}
+  /* History pills */
+  .hist-pills{flex-wrap:wrap;gap:4px}
+  .hist-pill{font-size:11px;padding:4px 8px}
+  /* Analyse tab */
+  .an-grid{grid-template-columns:1fr}
+  /* Tables — horizontal scroll */
+  .card table{font-size:11px}
+  .card table td,.card table th{padding:5px 4px}
+}
 .theme-btn{background:none;border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;font-size:14px;cursor:pointer;color:var(--tx)}
 body.force-light{--bg:#F7F6F3;--sur:#fff;--sur2:#F1F0EC;--bdr:rgba(0,0,0,.1);--tx:#1A1A18;--tx2:#6B6A65;--tx3:#9E9C97;--green:#1D9E75;--gbg:#E1F5EE;--red:#D85A30;--rbg:#FAECE7;--blue:#185FA5;--bbg:#E6F1FB;--amber:#BA7517;--abg:#FAEEDA;--purple:#534AB7}
 body.force-dark{--bg:#111110;--sur:#1C1C1A;--sur2:#242422;--bdr:rgba(255,255,255,.1);--tx:#EEECEA;--tx2:#9E9C97;--tx3:#6B6A65;--green:#5DCAA5;--gbg:#085041;--red:#F0997B;--rbg:#4A1B0C;--blue:#85B7EB;--bbg:#042C53;--amber:#FAC775;--abg:#412402;--purple:#AFA9EC}
