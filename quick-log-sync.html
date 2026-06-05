@@ -241,22 +241,18 @@ input[type=date]:focus{border-color:var(--green)}
   .an-stats-grid{grid-template-columns:repeat(2,1fr)}
   .month-bar{padding:10px 20px}
 }
-/* ── DESKTOP (900px+) ── full width like FT */
+/* ── DESKTOP (900px+) ── wider single column */
 @media(min-width:900px){
   body{background:var(--sur2)}
-  #app{max-width:960px;margin:0 auto;border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);min-height:100vh;background:var(--bg)}
-  .content{padding:24px 32px;display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  #app{max-width:720px;margin:0 auto;border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);min-height:100vh;background:var(--bg)}
+  .content{padding:24px 32px}
   .header{padding:14px 32px}
   .month-bar{padding:10px 32px}
   .an-panel{padding:24px 32px}
   .an-stats-grid{grid-template-columns:repeat(4,1fr)}
-  /* Full width items that should span both columns */
-  .ql-score-bar,.add-btn,.suggest-banner,#expList,#phoneBudgets,
-  .today-header,.ql-search-wrap,.mode-toggle,.copy-last-btn{grid-column:1/-1}
-  /* Category grid wider */
   .cat-grid{grid-template-columns:repeat(6,1fr)}
-  /* Numpad center */
-  .num-pad{max-width:400px;margin:0 auto}
+  .num-pad{max-width:460px;margin:0 auto}
+  .add-btn{font-size:17px;padding:16px}
 }
 @media(max-width:899px){
   #qlDesktopPanel{display:none!important}
@@ -266,7 +262,7 @@ input[type=date]:focus{border-color:var(--green)}
 }
 /* ── LARGE DESKTOP (1280px+) ── */
 @media(min-width:1280px){
-  #app{max-width:1100px}
+  #app{max-width:800px}
 }
 </style>
 </head>
