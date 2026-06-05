@@ -396,7 +396,13 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div class="metric"><div class="mlabel">Fixed <span id="fixedEstLabel" style="font-size:9px;color:var(--tx3);font-weight:400"></span></div><div class="mval red" id="s-fixed">₹0</div></div>
     <div class="metric"><div class="mlabel">Spent</div><div class="mval red" id="s-daily">₹0</div></div>
     <div class="metric"><div class="mlabel">Surplus</div><div class="mval green" id="s-savings">₹0</div></div>
-    <div class="metric"><div class="mlabel">Bank Balance</div><div class="mval" id="s-balance">₹0</div></div>
+    <div class="metric" style="cursor:pointer;position:relative" onclick="toggleBalanceDropdown()">
+      <div class="mlabel">Bank Balance <span style="font-size:9px;color:var(--tx3)" id="balDropArrow">▼</span></div>
+      <div class="mval" id="s-balance">₹0</div>
+      <div id="balDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--sur);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:20;padding:8px 0;margin-top:6px;min-width:200px">
+        <div id="balDropList"></div>
+      </div>
+    </div>
     <div class="metric" id="s-today-box"><div class="mlabel">Today spent</div><div class="mval" id="s-today-spent">₹0</div></div>
   </div>
   <div class="card" id="healthScoreCard">
@@ -3375,6 +3381,35 @@ function exportReport(months){
 function esc(str){
   if(!str)return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function toggleBalanceDropdown(){
+  var dd=document.getElementById('balDropdown');
+  var arrow=document.getElementById('balDropArrow');
+  if(!dd)return;
+  var isOpen=dd.style.display!=='none';
+  if(isOpen){dd.style.display='none';arrow.textContent='▼';return;}
+  /* Build account list */
+  var list=document.getElementById('balDropList');
+  var locked=hasIncomePassword()&&!_incomeUnlocked;
+  list.innerHTML=D.accounts.map(function(a){
+    var bal=getAccountBalance(a.id);
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:13px">'
+      +'<span style="color:var(--tx2)">'+esc(a.name)+'</span>'
+      +'<span style="font-family:monospace;font-weight:500;color:'+(bal>=0?'var(--green)':'var(--red)')+'">'+fmt(bal)+'</span>'
+      +'</div>';
+  }).join('');
+  if(!D.accounts.length){list.innerHTML='<div style="padding:8px 14px;font-size:13px;color:var(--tx3)">No accounts</div>';}
+  dd.style.display='block';
+  arrow.textContent='▲';
+  /* Close on outside click */
+  setTimeout(function(){
+    document.addEventListener('click',function closeDD(e){
+      if(!e.target.closest('[onclick="toggleBalanceDropdown()"]')){
+        dd.style.display='none';arrow.textContent='▼';
+        document.removeEventListener('click',closeDD);
+      }
+    });
+  },10);
 }
 function getAccountBalance(accountId){
   var spent=D.expenses.filter(function(e){return e.accountId===accountId;}).reduce(function(s,e){return s+e.amt;},0);
