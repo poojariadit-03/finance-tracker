@@ -414,6 +414,7 @@ input[type=date]:focus{border-color:var(--green)}
     <div id="an-cats"></div>
     <div id="an-vs"></div>
     <div id="an-dl"></div>
+    <div id="an-exp-list"></div>
   </div>
   <div class="an-section" id="an-days">
     <button onclick="exportQLAnalyseCSV()" style="width:100%;margin-bottom:10px;padding:10px;font-size:13px;font-weight:600;border-radius:10px;cursor:pointer;font-family:inherit;border:1px solid var(--bdr);background:var(--sur2);color:var(--tx2)">⬇ Export filtered results as CSV</button>
@@ -1444,6 +1445,28 @@ function renderQLAnalyse(){
       '<span style="color:var(--green)">✓ Within: '+okD+' days</span>'+
       '<span style="color:var(--red)">✗ Over: '+overD+' days</span>'+
       '</div></div>';
+  }
+  /* Expense list */
+  var expListEl=document.getElementById('an-exp-list');
+  if(expListEl){
+    var sortedExps=exps.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    expListEl.innerHTML=sortedExps.length
+      ?'<div style="margin-top:4px"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase;font-weight:500;margin-bottom:8px">Transactions ('+sortedExps.length+')</div>'
+        +sortedExps.map(function(e){
+          var acc=D.accounts.find(function(a){return a.id===e.accountId;});
+          var d=new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+          var c=CC2[e.cat]||'#888780';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bdr)">'
+            +'<div><div style="font-size:14px;font-weight:500">'+esc(e.name)+'</div>'
+            +'<div style="font-size:11px;color:var(--tx3);margin-top:2px">'
+            +'<span style="background:'+c+'22;color:'+c+';padding:1px 7px;border-radius:99px;font-size:10px;font-weight:600">'+e.cat+'</span>'
+            +(acc?' · '+esc(acc.name):'')
+            +' · '+d+'</div></div>'
+            +'<span style="font-size:15px;font-weight:600;color:var(--red);font-family:monospace">'+fmt(e.amt)+'</span>'
+            +'</div>';
+        }).join('')
+        +'</div>'
+      :'<p style="font-size:13px;color:var(--tx3);padding:10px 0">No expenses found.</p>';
   }
   /* Day by day */
   var grp={};exps.forEach(function(e){var d=new Date(e.date).getDate();if(!grp[d])grp[d]=[];grp[d].push(e);});
