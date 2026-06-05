@@ -228,6 +228,23 @@ input[type=date]:focus{border-color:var(--green)}
 .ql-search-input:focus{border-color:var(--green)}
 .ql-search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--tx3);font-size:15px;pointer-events:none}
 
+/* Tablet and desktop layout */
+@media(min-width:600px){
+  #app{max-width:480px;margin:0 auto;border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);min-height:100vh}
+  .header{padding:14px 20px}
+  .content{padding:20px}
+  .num-pad{max-width:380px;margin:0 auto}
+  .add-btn{font-size:18px;padding:18px}
+  .cat-grid{grid-template-columns:repeat(4,1fr)}
+  .mode-toggle{gap:8px}
+  .mode-btn{padding:8px 16px;font-size:14px}
+  .an-panel{padding:20px}
+  .an-stats-grid{grid-template-columns:repeat(4,1fr)}
+}
+@media(min-width:900px){
+  body{background:var(--sur2)}
+  #app{box-shadow:0 0 40px rgba(0,0,0,.1);border-radius:24px;margin-top:20px;margin-bottom:20px;min-height:auto}
+}
 </style>
 </head>
 <body>
