@@ -52,7 +52,8 @@ header h1{font-size:15px;font-weight:600;white-space:nowrap}
 .mnav{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx2);flex-shrink:0}
 .mnav button{background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--tx);font-size:15px;display:flex;align-items:center;justify-content:center}
 .mnav button:hover{background:var(--bdr)}
-.hd-right{display:flex;gap:7px}
+.hd-show-sm{display:none}
+.hd-right{display:flex;gap:7px;align-items:center}
 .btn{background:var(--tx);color:var(--sur);border:none;border-radius:var(--rs);padding:7px 14px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;white-space:nowrap;transition:opacity .15s,transform .1s}
 .btn:hover{opacity:.8}.btn:active{transform:scale(.96)}
 .btn-ghost{background:none;border:1px solid var(--bdr);border-radius:6px;padding:5px 12px;font-size:12px;font-family:inherit;color:var(--tx2);cursor:pointer;transition:background .15s,transform .1s}
@@ -149,51 +150,48 @@ input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:var(--bl
 @media(max-width:640px){
   .two-col{grid-template-columns:1fr}
   /* Header */
-  header{padding:.6rem 1rem;gap:6px}
+  header{padding:.6rem 1rem;gap:6px;flex-wrap:nowrap}
   header h1{font-size:13px}
-  .hd-right{gap:4px;flex-wrap:wrap}
+  .hd-left{gap:8px;min-width:0}
+  .hd-right{gap:4px;flex-shrink:0}
+  .hd-hide-sm{display:none!important}
+  .hd-show-sm{display:flex!important}
+  .gsearch-wrap{display:none}
   .btn{padding:5px 10px;font-size:12px}
-  .btn-ghost{padding:4px 8px;font-size:11px}
-  .theme-btn{width:28px;height:28px;font-size:13px}
+  .theme-btn{width:30px;height:30px;font-size:14px}
   /* Month nav */
   .mnav{font-size:12px;gap:6px}
   /* Tabs */
-  .tabs-wrap{padding:0 .75rem}
-  .tab{padding:8px 10px;font-size:12px}
+  .tabs-wrap{padding:0 .5rem}
+  .tab{padding:8px 9px;font-size:12px}
   /* Main */
   main{padding:.75rem .75rem 4rem}
-  /* Metric grid — 2 cols on mobile */
+  /* Metric grid — 2x3 on mobile, TODAY SPENT full width */
   .mgrid{grid-template-columns:repeat(2,1fr);gap:6px}
+  .mgrid .metric:last-child:nth-child(odd){grid-column:1/-1}
   .mval{font-size:15px}
-  .metric{padding:.6rem .8rem}
+  .metric{padding:.65rem .85rem}
   /* Cards */
   .card{padding:.85rem 1rem}
-  /* Input rows */
+  /* Input rows — stack */
   .irow{flex-direction:column;gap:6px}
-  .irow input,.irow select,.irow button{width:100%!important;max-width:100%!important}
-  .srow{flex-wrap:wrap}
+  .irow input,.irow select,.irow button{width:100%!important;max-width:100%!important;min-width:0!important}
+  .srow{flex-wrap:wrap;gap:6px}
   .srow label{min-width:auto;width:100%}
-  /* Lent items */
+  .srow input,.srow select{width:100%!important;max-width:100%!important}
+  /* Lent */
   .lent-item{flex-direction:column;gap:8px}
   .lent-right{flex-direction:row;justify-content:space-between;width:100%}
   /* Account grid */
   .agrid{grid-template-columns:repeat(2,1fr)}
-  /* Goals grid */
-  .gcards{grid-template-columns:1fr}
-  /* Health score bars */
-  .bars{grid-template-columns:1fr}
   /* Modal */
   .modal-box{margin:10px;max-width:calc(100vw - 20px)!important;max-height:90vh;overflow-y:auto}
-  /* Quick setup */
-  .irow input[type=text]{flex:none;width:100%}
   /* History pills */
   .hist-pills{flex-wrap:wrap;gap:4px}
   .hist-pill{font-size:11px;padding:4px 8px}
-  /* Analyse tab */
-  .an-grid{grid-template-columns:1fr}
-  /* Tables — horizontal scroll */
+  /* Tables */
   .card table{font-size:11px}
-  .card table td,.card table th{padding:5px 4px}
+  .card table td,.card table th{padding:5px 3px}
 }
 .theme-btn{background:none;border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;font-size:14px;cursor:pointer;color:var(--tx)}
 body.force-light{--bg:#F7F6F3;--sur:#fff;--sur2:#F1F0EC;--bdr:rgba(0,0,0,.1);--tx:#1A1A18;--tx2:#6B6A65;--tx3:#9E9C97;--green:#1D9E75;--gbg:#E1F5EE;--red:#D85A30;--rbg:#FAECE7;--blue:#185FA5;--bbg:#E6F1FB;--amber:#BA7517;--abg:#FAEEDA;--purple:#534AB7}
@@ -404,17 +402,32 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <button id="todayNavBtn" onclick="jumpToToday()" style="display:none;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--gbg);color:var(--green);border-color:var(--green)">Today</button>
   </div>
   <div class="hd-right">
-    <div class="gsearch-wrap">
-      <input type="text" id="globalSearch" placeholder="🔍 All months…" oninput="doGlobalSearch(this.value)" onfocus="doGlobalSearch(this.value)" style="font-size:12px;padding:6px 10px" autocomplete="off">
+    <div class="gsearch-wrap" id="gsearchWrap">
+      <input type="text" id="globalSearch" placeholder="🔍 Search…" oninput="doGlobalSearch(this.value)" onfocus="doGlobalSearch(this.value)" style="font-size:12px;padding:6px 10px" autocomplete="off">
       <div class="gsearch-results" id="gsearchResults"></div>
     </div>
-    <button class="btn export-btn" style="background:var(--blue)" onclick="openExportModal('report')">📊 Report</button>
-    <button class="btn export-btn" style="background:var(--green)" onclick="openExportModal('excel')">⬇ Excel</button>
+    <button class="btn export-btn hd-hide-sm" style="background:var(--blue)" onclick="openExportModal('report')">📊 Report</button>
+    <button class="btn export-btn hd-hide-sm" style="background:var(--green)" onclick="openExportModal('excel')">⬇ Excel</button>
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
-    <button class="theme-btn" id="fontBtn" onclick="cycleFontSize()">A</button>
     <button class="theme-btn" id="incomeLockBtn" onclick="toggleIncomeLock()" title="Lock/Unlock income">🔒</button>
-    <button class="btn-ghost" onclick="disconnectFirebase()">⚙️ Setup</button>
-    <button class="btn-ghost" onclick="openSetPassword()">🔑 Password</button>
+    <!-- Mobile menu button -->
+    <button class="theme-btn hd-show-sm" onclick="toggleMobileMenu()" id="mobileMenuBtn">☰</button>
+    <button class="btn-ghost hd-hide-sm" onclick="disconnectFirebase()">⚙️ Setup</button>
+    <button class="btn-ghost hd-hide-sm" onclick="openSetPassword()">🔑 Password</button>
+  </div>
+  <!-- Mobile dropdown menu -->
+  <div id="mobileMenu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;background:rgba(0,0,0,.5)" onclick="closeMobileMenu()">
+    <div style="position:absolute;top:0;right:0;background:var(--sur);width:240px;height:100%;padding:20px;box-shadow:-4px 0 20px rgba(0,0,0,.2);overflow-y:auto" onclick="event.stopPropagation()">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <span style="font-weight:600;font-size:15px">Menu</span>
+        <button onclick="closeMobileMenu()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--tx3)">×</button>
+      </div>
+      <button class="btn export-btn" style="width:100%;background:var(--blue);margin-bottom:10px" onclick="openExportModal('report');closeMobileMenu()">📊 Report</button>
+      <button class="btn export-btn" style="width:100%;background:var(--green);margin-bottom:10px" onclick="openExportModal('excel');closeMobileMenu()">⬇ Excel</button>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="cycleFontSize();closeMobileMenu()">A Font size</button>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="openSetPassword();closeMobileMenu()">🔑 Password</button>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="disconnectFirebase()">⚙️ Setup</button>
+    </div>
   </div>
 </header>
 <div class="banner banner-red" id="spendBanner" style="display:none">
@@ -3375,6 +3388,8 @@ function applyIncomeLock(){
     }
   });
 }
+function toggleMobileMenu(){var m=document.getElementById('mobileMenu');if(m)m.style.display=m.style.display==='none'?'block':'none';}
+function closeMobileMenu(){var m=document.getElementById('mobileMenu');if(m)m.style.display='none';}
 function applyTheme(t){document.body.classList.remove('force-light','force-dark');if(t==='light')document.body.classList.add('force-light');if(t==='dark')document.body.classList.add('force-dark');var btn=document.getElementById('themeBtn');if(btn)btn.textContent=t==='dark'?'☀️':t==='light'?'🌙':'auto';}
 function toggleTheme(){var ts=['auto','light','dark'],cur=D.config.theme||'auto',nxt=ts[(ts.indexOf(cur)+1)%3];D.config.theme=nxt;autoSave();applyTheme(nxt);}
 function applyFontSize(f){document.body.classList.remove('fs-large','fs-small');if(f==='large')document.body.classList.add('fs-large');if(f==='small')document.body.classList.add('fs-small');var btn=document.getElementById('fontBtn');if(btn)btn.textContent=f==='large'?'A+':f==='small'?'A-':'A';}
