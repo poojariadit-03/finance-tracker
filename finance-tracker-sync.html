@@ -396,10 +396,14 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
     <div class="metric"><div class="mlabel">Fixed <span id="fixedEstLabel" style="font-size:9px;color:var(--tx3);font-weight:400"></span></div><div class="mval red" id="s-fixed">₹0</div></div>
     <div class="metric"><div class="mlabel">Spent</div><div class="mval red" id="s-daily">₹0</div></div>
     <div class="metric"><div class="mlabel">Surplus</div><div class="mval green" id="s-savings">₹0</div></div>
-    <div class="metric" style="cursor:pointer;position:relative" onclick="toggleBalanceDropdown()">
-      <div class="mlabel">Bank Balance <span style="font-size:9px;color:var(--tx3)" id="balDropArrow">▼</span></div>
-      <div class="mval" id="s-balance">₹0</div>
-      <div id="balDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--sur);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:20;padding:8px 0;margin-top:6px;min-width:200px">
+    <div class="metric" style="cursor:pointer;position:relative;user-select:none" onclick="toggleBalanceDropdown()">
+      <div class="mlabel" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Bank Balance</span>
+        <span id="balDropArrow" style="font-size:10px;color:var(--tx3);transition:transform .2s">▼</span>
+      </div>
+      <div class="mval" id="s-balance" style="margin-top:4px">₹0</div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:2px">Tap to see breakdown</div>
+      <div id="balDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--sur);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:20;padding:6px 0;margin-top:4px;min-width:200px">
         <div id="balDropList"></div>
       </div>
     </div>
@@ -3393,11 +3397,11 @@ function toggleBalanceDropdown(){
   var locked=hasIncomePassword()&&!_incomeUnlocked;
   list.innerHTML=D.accounts.map(function(a){
     var bal=getAccountBalance(a.id);
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:13px">'
-      +'<span style="color:var(--tx2)">'+esc(a.name)+'</span>'
-      +'<span style="font-family:monospace;font-weight:500;color:'+(bal>=0?'var(--green)':'var(--red)')+'">'+fmt(bal)+'</span>'
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;font-size:13px;border-bottom:1px solid var(--bdr)">'
+      +'<div><div style="font-weight:500;color:var(--tx)">'+esc(a.name)+'</div><div style="font-size:11px;color:var(--tx3)">'+a.type+'</div></div>'
+      +'<span style="font-family:monospace;font-weight:600;font-size:14px;color:'+(bal>=0?'var(--green)':'var(--red)')+'">'+fmt(bal)+'</span>'
       +'</div>';
-  }).join('');
+  }).join('')+'<div style="padding:8px 14px;font-size:11px;color:var(--tx3);text-align:right">Total: '+fmt(D.accounts.reduce(function(s,a){return s+getAccountBalance(a.id);},0))+'</div>';
   if(!D.accounts.length){list.innerHTML='<div style="padding:8px 14px;font-size:13px;color:var(--tx3)">No accounts</div>';}
   dd.style.display='block';
   arrow.textContent='▲';
