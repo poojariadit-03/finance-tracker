@@ -370,6 +370,11 @@ input[type=date]:focus{border-color:var(--green)}
     <div class="field-label">Category</div>
     <div class="cat-grid" id="catGrid"></div>
     <div class="cat-grid" id="incGrid" style="display:none"></div>
+    <!-- Income account selector -->
+    <div id="incAccRow" style="display:none;margin-bottom:10px">
+      <div class="field-label">Into account</div>
+      <select id="qlIncAcc" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;padding:13px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none"></select>
+    </div>
 
     <!-- AFTER-ADD FEEDBACK -->
     <div class="add-feedback" id="addFeedback"></div>
@@ -1312,6 +1317,11 @@ var INC_SOURCES=[{key:'Pocket Money',icon:'💵'},{key:'Freelance',icon:'💻'},
 function setMode(m){
   var isLent=m==='lent';
   var isTransfer=m==='transfer';
+  var isIncome=m==='income';
+  var isExpense=m==='expense';
+  /* Hide daily limit for non-expense modes */
+  var dlRow=document.querySelector('.dlimit-row');
+  if(dlRow)dlRow.style.display=isExpense?'':'none';
   var lentF=document.getElementById('lentFields');
   var transF=document.getElementById('transferFields');
   if(lentF)lentF.style.display=isLent?'block':'none';
@@ -1360,6 +1370,11 @@ function setMode(m){
   document.getElementById('expName').placeholder=isInc?'e.g. Pocket money from dad, Freelance...':'e.g. Zomato biryani, Auto, Medicine...';
   document.getElementById('catGrid').style.display=isInc?'none':'grid';
   document.getElementById('incGrid').style.display=isInc?'grid':'none';
+  /* Show/hide income account selector */
+  var incAccRow=document.getElementById('incAccRow');
+  var qlIncAcc=document.getElementById('qlIncAcc');
+  if(incAccRow){incAccRow.style.display=isInc?'block':'none';}
+  if(isInc&&qlIncAcc){qlIncAcc.innerHTML=(D.accounts||[]).map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join('');}
   document.getElementById('noteLabel').style.display='';
   document.getElementById('expNote').style.display='';
   document.getElementById('expTags').style.display='';
@@ -1422,15 +1437,19 @@ function addIncome(){
   var name=document.getElementById('expName').value.trim(),note=document.getElementById('expNote').value.trim(),amt=parseFloat(amtStr),dv=document.getElementById('expDate').value||todayStr();
   if(!name){showToast('Enter a description','error');return;}
   if(!amt||amt<=0){showToast('Enter an amount','error');return;}
+  /* Get selected account from income account dropdown */
+  var incAccSel=document.getElementById('qlIncAcc');
+  var accId=incAccSel&&incAccSel.value?incAccSel.value:(D.accounts&&D.accounts.length?D.accounts[0].id:'');
   var parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
   if(!D.extraIncome)D.extraIncome=[];
-  D.extraIncome.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,source:selIncomeSrc,amt:amt,accountId:selAccId});
+  D.extraIncome.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,source:selIncomeSrc,amt:amt,accountId:accId});
   autoSave();document.getElementById('expName').value='';document.getElementById('expNote').value='';
   var te=document.getElementById('expTags');if(te)te.value='';amtStr='';updateAmt();selIncomeSrc='Pocket Money';renderIncSources();
   document.activeElement&&document.activeElement.blur();
   renderList();renderMonthBar();
+  var accName=D.accounts.find(function(a){return a.id===accId;});
   if(navigator.vibrate)navigator.vibrate(50);
-  showToast('+'+fmt(amt)+' income added!','success');renderQLScore();
+  showToast('+'+fmt(amt)+' added to '+(accName?accName.name:'account')+'!','success');renderQLScore();
 }
 function exportQLAnalyseCSV(){
   var selMonth=document.getElementById('an-month').value||(new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
