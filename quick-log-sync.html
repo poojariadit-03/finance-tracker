@@ -370,11 +370,8 @@ input[type=date]:focus{border-color:var(--green)}
     <div class="field-label">Category</div>
     <div class="cat-grid" id="catGrid"></div>
     <div class="cat-grid" id="incGrid" style="display:none"></div>
-    <!-- Income account selector -->
-    <div id="incAccRow" style="display:none;margin-bottom:10px">
-      <div class="field-label">Into account</div>
-      <select id="qlIncAcc" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:12px;padding:13px 14px;font-size:14px;color:var(--tx);font-family:inherit;outline:none"></select>
-    </div>
+    <!-- Income account selector removed - using account pills below instead -->
+    <div id="incAccRow" style="display:none"></div>
 
     <!-- AFTER-ADD FEEDBACK -->
     <div class="add-feedback" id="addFeedback"></div>
@@ -1437,9 +1434,7 @@ function addIncome(){
   var name=document.getElementById('expName').value.trim(),note=document.getElementById('expNote').value.trim(),amt=parseFloat(amtStr),dv=document.getElementById('expDate').value||todayStr();
   if(!name){showToast('Enter a description','error');return;}
   if(!amt||amt<=0){showToast('Enter an amount','error');return;}
-  /* Get selected account from income account dropdown */
-  var incAccSel=document.getElementById('qlIncAcc');
-  var accId=incAccSel&&incAccSel.value?incAccSel.value:(D.accounts&&D.accounts.length?D.accounts[0].id:'');
+  var accId=selAccId||(D.accounts&&D.accounts.length?D.accounts[0].id:'');
   var parts=dv.split('-'),ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0).toISOString(),m=parts[0]+'-'+parts[1];
   if(!D.extraIncome)D.extraIncome=[];
   D.extraIncome.push({id:Date.now().toString(),date:ed,month:m,name:name,note:note,source:selIncomeSrc,amt:amt,accountId:accId});
