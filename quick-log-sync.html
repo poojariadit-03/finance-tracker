@@ -569,8 +569,34 @@ function disconnectFirebase(){if(!confirm('Disconnect?'))return;localStorage.rem
 var _offlineQueue=[];
 var _isOnline=navigator.onLine;
 var LS_CACHE='ft_ql_cache';
+var LS_PENDING='ft_ql_pending'; /* persisted offline data */
 
-/* Online/offline detection */
+function saveToCache(){
+  try{
+    localStorage.setItem(LS_CACHE,JSON.stringify(D));
+  }catch(e){}
+}
+function loadFromCache(){
+  try{
+    var cached=localStorage.getItem(LS_CACHE);
+    if(cached)return JSON.parse(cached);
+  }catch(e){}
+  return null;
+}
+function savePendingData(){
+  /* Save current D as pending — will be pushed to Firebase when online */
+  try{localStorage.setItem(LS_PENDING,JSON.stringify({data:D,ts:Date.now()}));}catch(e){}
+}
+function clearPendingData(){
+  try{localStorage.removeItem(LS_PENDING);}catch(e){}
+}
+function loadPendingData(){
+  try{
+    var p=localStorage.getItem(LS_PENDING);
+    if(p)return JSON.parse(p);
+  }catch(e){}
+  return null;
+}
 window.addEventListener('online',function(){
   _isOnline=true;
   updateOnlineBanner();
@@ -590,23 +616,15 @@ function updateOnlineBanner(){
   if(b)b.style.display=_isOnline?'none':'flex';
 }
 function flushOfflineQueue(){
-  if(!_offlineQueue.length||!db)return;
+  if(!db)return;
   db.ref('finances/data').set(JSON.stringify(D)).then(function(){
     _offlineQueue=[];
+    clearPendingData();
     setSyncStatus('synced');
+    showToast('Synced ✓','success');
   }).catch(function(){
     setSyncStatus('error');
   });
-}
-function saveToCache(){
-  try{localStorage.setItem(LS_CACHE,JSON.stringify(D));}catch(e){}
-}
-function loadFromCache(){
-  try{
-    var cached=localStorage.getItem(LS_CACHE);
-    if(cached){var d=JSON.parse(cached);return d;}
-  }catch(e){}
-  return null;
 }
 
 function loadFromFirebase(){
@@ -629,6 +647,25 @@ function loadFromFirebase(){
     }
     return;
   }
+  /* Check if there is pending offline data to push first */
+  var pending=loadPendingData();
+  if(pending&&pending.data){
+    /* Push pending data to Firebase before loading */
+    db.ref('finances/data').set(JSON.stringify(pending.data)).then(function(){
+      clearPendingData();
+      showToast('Offline expenses synced ✓','success');
+      /* Now load fresh from Firebase */
+      doLoadFromFirebase(cached);
+    }).catch(function(){
+      /* If push fails, still load */
+      doLoadFromFirebase(cached);
+    });
+  } else {
+    doLoadFromFirebase(cached);
+  }
+}
+
+function doLoadFromFirebase(cached){
   db.ref('finances/data').once('value').then(function(snap){
     var val=snap.val();
     if(val){
@@ -776,6 +813,7 @@ function autoSave(){
   setSyncStatus('syncing');
   if(saveTimer)clearTimeout(saveTimer);
   if(!_isOnline){
+    savePendingData(); /* Persist to localStorage so it survives app restart */
     _offlineQueue.push(Date.now());
     setSyncStatus('offline');
     return;
@@ -784,8 +822,10 @@ function autoSave(){
     db.ref('finances/data').set(JSON.stringify(D)).then(function(){
       setSyncStatus('synced');
       _offlineQueue=[];
+      clearPendingData(); /* Clear pending since Firebase is updated */
     }).catch(function(){
       setSyncStatus('error');
+      savePendingData(); /* Save pending on error too */
       _offlineQueue.push(Date.now());
     });
   },2000);
