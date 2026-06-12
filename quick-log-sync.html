@@ -650,14 +650,27 @@ function loadFromFirebase(){
   /* Check if there is pending offline data to push first */
   var pending=loadPendingData();
   if(pending&&pending.data){
-    /* Push pending data to Firebase before loading */
-    db.ref('finances/data').set(JSON.stringify(pending.data)).then(function(){
+    /* Use pending data as current D */
+    D=pending.data;
+    if(!D.extraIncome)D.extraIncome=[];if(!D.accounts)D.accounts=[];
+    if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.budgets)D.budgets={};
+    saveToCache();
+    /* Push pending data to Firebase */
+    db.ref('finances/data').set(JSON.stringify(D)).then(function(){
       clearPendingData();
       showToast('Offline expenses synced ✓','success');
-      /* Now load fresh from Firebase */
-      doLoadFromFirebase(cached);
+      setSyncStatus('synced');
+      /* Refresh UI */
+      if(!cached){
+        document.getElementById('loading').style.display='none';
+        document.getElementById('app').style.display='block';
+        initUI();
+      } else {
+        renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();
+      }
+      startFirebaseListener();
     }).catch(function(){
-      /* If push fails, still load */
+      showToast('Sync failed — will retry','error');
       doLoadFromFirebase(cached);
     });
   } else {
@@ -683,12 +696,20 @@ function doLoadFromFirebase(cached){
       document.getElementById('app').style.display='block';
       initUI();
     } else {
-      /* Refresh UI with fresh data */
       renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();
     }
     setSyncStatus('synced');
-    /* Listen for live changes */
-    db.ref('finances/data').on('value',function(snap){
+    startFirebaseListener();
+  }).catch(function(e){
+    if(!cached){
+      document.getElementById('loadingTxt').textContent='Error loading: '+e.message;
+    }
+    setSyncStatus('error');
+  });
+}
+
+function startFirebaseListener(){
+  db.ref('finances/data').on('value',function(snap){
       var v=snap.val();
       if(v){
         try{
@@ -703,12 +724,6 @@ function doLoadFromFirebase(cached){
         }catch(e){}
       }
     });
-  }).catch(function(e){
-    if(!cached){
-      document.getElementById('loadingTxt').textContent='Error loading: '+e.message;
-    }
-    setSyncStatus('error');
-  });
 }
 
 /* ═══ FINANCIAL HEALTH SCORE (quick-log) ═══ */
