@@ -437,6 +437,8 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       </div>
       <button class="btn export-btn hd-hide-sm" style="background:var(--blue)" onclick="openExportModal('report')">📊 Report</button>
       <button class="btn export-btn hd-hide-sm" style="background:var(--green)" onclick="openExportModal('excel')">⬇ Excel</button>
+      <button class="btn-ghost hd-hide-sm" onclick="showFinancialTips()" title="Financial Tips">💡</button>
+      <button class="btn-ghost hd-hide-sm" onclick="downloadBackup()" title="Backup Data">💾</button>
       <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
       <button class="theme-btn" id="incomeLockBtn" onclick="toggleIncomeLock()" title="Lock/Unlock income">🔒</button>
       <button class="theme-btn hd-show-sm" onclick="toggleMobileMenu()" id="mobileMenuBtn">☰</button>
@@ -459,6 +461,9 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       </div>
       <button class="btn export-btn" style="width:100%;background:var(--blue);margin-bottom:10px" onclick="openExportModal('report');closeMobileMenu()">📊 Report</button>
       <button class="btn export-btn" style="width:100%;background:var(--green);margin-bottom:10px" onclick="openExportModal('excel');closeMobileMenu()">⬇ Excel</button>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="showFinancialTips();closeMobileMenu()">💡 Financial Tips</button>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="downloadBackup();closeMobileMenu()">💾 Backup Data</button>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="restoreBackup();closeMobileMenu()">📥 Restore Backup</button>
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="cycleFontSize();closeMobileMenu()">A Font size</button>
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="openSetPassword();closeMobileMenu()">🔑 Password</button>
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;padding:10px 12px" onclick="disconnectFirebase()">⚙️ Setup</button>
@@ -1089,17 +1094,29 @@ function doGlobalSearch(q){
     var qq=q.toLowerCase();
     var expResults=D.expenses.filter(function(e){
       return e.name.toLowerCase().indexOf(qq)>-1||e.cat.toLowerCase().indexOf(qq)>-1||(e.note&&e.note.toLowerCase().indexOf(qq)>-1)||(e.tags&&e.tags.toLowerCase().indexOf(qq)>-1);
-    });
+    }).map(function(e){return {id:e.id,name:e.name,cat:e.cat,amt:e.amt,date:e.date,month:e.month,_type:'expense'};});
     var incResults=(D.extraIncome||[]).filter(function(e){
       return e.name.toLowerCase().indexOf(qq)>-1||(e.source&&e.source.toLowerCase().indexOf(qq)>-1);
-    }).map(function(e){return {id:e.id,name:e.name,cat:e.source||'Income',amt:e.amt,date:e.date,month:e.month,_isIncome:true};});
-    var results=expResults.concat(incResults).slice().reverse().slice(0,20);
-    if(!results.length){el.innerHTML='<div class="gsr-item" style="color:var(--tx3)">No results</div>';el.classList.add('show');return;}
-    el.innerHTML=results.map(function(e){
-      var d=new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
-      var icon=e._isIncome?'<span style="color:var(--green);font-size:11px;margin-right:4px">+</span>':'';
-      return '<div class="gsr-item" onclick="jumpToExpense(\''+e.month+'\')"><div><div class="gsr-name">'+e.name+'</div><div class="gsr-meta">'+d+' · '+e.cat+'</div></div><span style="font-family:\'DM Mono\',monospace;font-size:13px;font-weight:500;flex-shrink:0">'+fmt(e.amt)+'</span></div>';
-    }).join('');
+    }).map(function(e){return {id:e.id,name:e.name,cat:e.source||'Income',amt:e.amt,date:e.date,month:e.month,_type:'income'};});
+    var lentResults=(D.lent||[]).filter(function(l){
+      return l.name.toLowerCase().indexOf(qq)>-1||(l.note&&l.note.toLowerCase().indexOf(qq)>-1);
+    }).map(function(l){return {id:l.id,name:l.name,cat:'Lent',amt:l.amt,date:l.date,month:(l.date||'').slice(0,7),_type:'lent'};});
+    var results=expResults.concat(incResults).concat(lentResults)
+      .sort(function(a,b){return new Date(b.date)-new Date(a.date);})
+      .slice(0,25);
+    if(!results.length){el.innerHTML='<div class="gsr-item" style="color:var(--tx3);padding:12px">No results for "'+q+'"</div>';el.classList.add('show');return;}
+    var color={'expense':'var(--tx)','income':'var(--green)','lent':'var(--blue)'};
+    var prefix={'expense':'','income':'+','lent':'💳'};
+    el.innerHTML='<div style="padding:6px 12px;font-size:11px;color:var(--tx3);border-bottom:1px solid var(--bdr)">'
+      +results.length+' results for "'+q+'"</div>'
+      +results.map(function(e){
+        var d=new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+        return '<div class="gsr-item" onclick="jumpToExpense(\''+e.month+'\')">'
+          +'<div><div class="gsr-name">'+esc(e.name)+'</div>'
+          +'<div class="gsr-meta">'+d+' · '+e.cat+'</div></div>'
+          +'<span style="font-family:monospace;font-size:13px;font-weight:500;flex-shrink:0;color:'+color[e._type]+'">'+prefix[e._type]+fmt(e.amt)+'</span>'
+          +'</div>';
+      }).join('');
     el.classList.add('show');
   },200);
 }
@@ -3265,6 +3282,105 @@ function exportReportRange(fromD,toD){
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download='report-'+label+'.html';a.click();
   showToast('Report downloaded!','success');
 }
+/* ═══ PDF EXPORT ═══ */
+function exportPDF(){
+  var fromD=_rangeFrom?new Date(_rangeFrom+'T00:00:00'):new Date(curDate.getFullYear(),curDate.getMonth(),1);
+  var toD=_rangeTo?new Date(_rangeTo+'T23:59:59'):new Date(curDate.getFullYear(),curDate.getMonth()+1,0);
+  exportReportRange(fromD,toD);
+  showToast('Report generated — open the HTML file and press Ctrl+P to save as PDF','info');
+}
+
+/* ═══ FINANCIAL TIPS ═══ */
+function showFinancialTips(){
+  var tips=[];
+  var income=(D.config.income||0);
+  var fxd=fixedMonthly();
+  var spent=getExpenses().reduce(function(s,e){return s+e.amt;},0);
+  var savPct=income>0?((income-fxd-spent)/income*100):0;
+  var cats={};getExpenses().forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+e.amt;});
+  var topCat=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];})[0];
+
+  /* Generate personalized tips */
+  if(savPct<10&&income>0) tips.push({icon:'⚠️',text:'Savings rate is only '+savPct.toFixed(0)+'%. Try to save at least 20% of income.',type:'warning'});
+  else if(savPct>=30) tips.push({icon:'🎉',text:'Excellent! You are saving '+savPct.toFixed(0)+'% of income. Keep it up!',type:'success'});
+  else if(savPct>=20) tips.push({icon:'✅',text:'Good saving rate of '+savPct.toFixed(0)+'%. Try to increase it to 30%.',type:'info'});
+
+  if(fxd/income>0.6&&income>0) tips.push({icon:'🔴',text:'Fixed expenses are '+Math.round(fxd/income*100)+'% of income. Try to bring them under 50%.',type:'warning'});
+
+  if(topCat) tips.push({icon:'💡',text:'Your top spending category is '+topCat+' ('+fmt(cats[topCat])+'). Review if it can be reduced.',type:'info'});
+
+  var unpaidLent=(D.lent||[]).filter(function(l){return !l.returned&&!l.writtenOff;});
+  if(unpaidLent.length>0){
+    var lentTotal=unpaidLent.reduce(function(s,l){return s+l.amt;},0);
+    tips.push({icon:'💳',text:unpaidLent.length+' pending lent entries totalling '+fmt(lentTotal)+'. Follow up for recovery.',type:'warning'});
+  }
+
+  var goalProgress=(D.goals||[]).map(function(g){
+    var saved=(g.contributions||[]).reduce(function(s,c){return s+c.amount;},0);
+    return {name:g.name,pct:g.target>0?saved/g.target*100:0};
+  });
+  var slowGoal=goalProgress.find(function(g){return g.pct<20;});
+  if(slowGoal) tips.push({icon:'🎯',text:'Goal "'+slowGoal.name+'" is only '+slowGoal.pct.toFixed(0)+'% complete. Consider increasing contributions.',type:'info'});
+
+  if(!Object.keys(D.budgets).length) tips.push({icon:'📊',text:'You have no category budgets set. Set budgets to track and control spending.',type:'info'});
+
+  var paid=getPaid();
+  var overdueBills=D.fixed.filter(function(f){return f.recurring&&f.dueDay&&f.dueDay<new Date().getDate()&&paid.indexOf(f.id)<0;});
+  if(overdueBills.length) tips.push({icon:'⏰',text:overdueBills.length+' bill(s) overdue: '+overdueBills.map(function(f){return f.name;}).join(', '),type:'warning'});
+
+  if(!tips.length) tips.push({icon:'✨',text:'Your finances look great! Keep tracking consistently.',type:'success'});
+
+  var colors={warning:'var(--abg)',success:'var(--gbg)',info:'var(--bbg)'};
+  var textColors={warning:'var(--amber)',success:'var(--green)',info:'var(--blue)'};
+  var html=tips.map(function(t){
+    return '<div style="display:flex;gap:12px;align-items:flex-start;padding:12px;background:'+colors[t.type]+';border-radius:10px;margin-bottom:8px">'
+      +'<span style="font-size:20px;flex-shrink:0">'+t.icon+'</span>'
+      +'<span style="font-size:13px;color:'+textColors[t.type]+'">'+t.text+'</span>'
+      +'</div>';
+  }).join('');
+
+  /* Show in a modal */
+  document.getElementById('lentActionTitle').textContent='💡 Financial Tips';
+  document.getElementById('lentActionBody').innerHTML=html;
+  document.getElementById('lentActionModal').classList.add('show');
+}
+
+/* ═══ DATA BACKUP ═══ */
+function downloadBackup(){
+  var backup={
+    version:'1.0',
+    exportedAt:new Date().toISOString(),
+    data:D
+  };
+  var json=JSON.stringify(backup,null,2);
+  var a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(json);
+  a.download='finance-backup-'+mk()+'.json';
+  a.click();
+  showToast('Backup downloaded ✓','success');
+}
+function restoreBackup(){
+  var inp=document.createElement('input');
+  inp.type='file';inp.accept='.json';
+  inp.onchange=function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var backup=JSON.parse(ev.target.result);
+        var restored=backup.data||backup;
+        if(!restored.expenses||!restored.config){showToast('Invalid backup file','error');return;}
+        if(!confirm('This will replace ALL your current data with the backup. Continue?'))return;
+        D=restored;
+        autoSave();renderAll();
+        showToast('Backup restored successfully ✓','success');
+      }catch(err){showToast('Failed to restore: '+err.message,'error');}
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
 function exportCSV(){
   var arr;
   if(typeof _rangeFrom!=='undefined'&&(_rangeFrom||_rangeTo)){
