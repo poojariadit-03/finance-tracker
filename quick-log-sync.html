@@ -548,12 +548,26 @@ function initFirebase(cfg){
         try{
           if(!firebase.apps.length)firebase.initializeApp(cfg);
           db=firebase.database();
-          flushOfflineQueue();
-          /* Start live listener */
-          db.ref('finances/data').on('value',function(snap){
-            var v=snap.val();
-            if(v){try{var fresh=JSON.parse(v);if(JSON.stringify(fresh)!==JSON.stringify(D)){D=fresh;saveToCache();renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();}}catch(e){}}
-          });
+          updateOnlineBanner();
+          /* Check pending localStorage data first */
+          var pending=loadPendingData();
+          if(pending&&pending.data){
+            D=pending.data;
+            if(!D.extraIncome)D.extraIncome=[];if(!D.accounts)D.accounts=[];
+            if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.budgets)D.budgets={};
+            saveToCache();
+            db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+              clearPendingData();
+              showToast('Offline expenses synced ✓','success');
+              setSyncStatus('synced');
+              renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();
+              startFirebaseListener();
+            }).catch(function(){
+              showToast('Sync failed','error');
+            });
+          } else {
+            startFirebaseListener();
+          }
         }catch(e){}
       },{once:true});
       return;
