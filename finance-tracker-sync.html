@@ -473,6 +473,10 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <span id="reminderText"></span>
   <button onclick="switchTab('fixed')">View →</button>
 </div>
+<div class="banner" id="budgetAlertBanner" style="display:none;background:var(--rbg);border-bottom:1px solid var(--red);color:var(--red)">
+  <span id="budgetAlertText" style="font-size:12px"></span>
+  <button onclick="switchTab('fixed')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">Budgets →</button>
+</div>
 <div class="tabs-wrap">
   <button class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
   <button class="tab" data-tab="accounts" onclick="switchTab('accounts')">Accounts</button>
@@ -985,7 +989,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   <div class="mgrid">
     <div class="metric"><div class="mlabel">Total Assets</div><div class="mval green" id="nw-assets">₹0</div></div>
     <div class="metric"><div class="mlabel">Liabilities</div><div class="mval red" id="nw-liab">₹0</div></div>
-    <div class="metric"><div class="mlabel">Net Worth</div><div class="mval" id="nw-total">₹0</div></div>
+    <div class="metric"><div class="mlabel">Net Worth</div><div class="mval" id="nw-total">₹0</div><div id="nw-change" style="display:none;font-size:11px;margin-top:3px"></div></div>
   </div>
   <div class="card" id="nwRatioCard" style="display:none">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -2169,7 +2173,32 @@ function renderBudgetBars(){
   }
   el.innerHTML=summaryHtml+cats.map(function(cat){var baseLimit=budgets[cat],carry=carryover[cat]||0,limit=baseLimit+carry,used=spent[cat]||0,pct=Math.min(100,used/limit*100),over=used>limit,barCol=pct<60?'var(--green)':pct<85?'var(--amber)':'var(--red)',catCol=getCatColor(cat);var pill=over?'<span style="background:var(--rbg);color:var(--red);font-size:10px;font-weight:600;padding:1px 8px;border-radius:99px;margin-left:6px">OVER</span>':pct>=85?'<span style="background:var(--abg);color:var(--amber);font-size:10px;font-weight:600;padding:1px 8px;border-radius:99px;margin-left:6px">NEAR LIMIT</span>':'';return '<div style="margin-bottom:13px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="display:flex;align-items:center;font-size:13px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:'+catCol+';display:inline-block;margin-right:6px"></span>'+cat+pill+'</span><span style="font-size:12px;font-family:\'DM Mono\',monospace">'+fmt(used)+' / '+fmt(limit)+'</span></div><div class="pbg" style="height:8px"><div class="pfill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+'"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;margin-top:3px"><span style="color:'+(over?'var(--red)':pct>=85?'var(--amber)':'var(--tx3)')+'">'+( over?'Over by '+fmt(used-limit):fmt(Math.max(0,limit-used))+' left')+'</span><span style="color:var(--tx3)">'+pct.toFixed(0)+'% used</span></div></div>';}).join('');
 }
-function checkBudgetAlerts(){var cats=Object.keys(D.budgets),badge=document.getElementById('budgetBadge');if(!cats.length){badge.style.display='none';return;}var spent={};getExpenses().forEach(function(e){spent[e.cat]=(spent[e.cat]||0)+e.amt;});var over=cats.filter(function(c){return (spent[c]||0)>D.budgets[c];});var near=cats.filter(function(c){var u=spent[c]||0;return u<=D.budgets[c]&&u/D.budgets[c]>=0.85;});if(over.length){badge.textContent=over.length;badge.style.display='inline-block';badge.style.background='var(--red)';}else if(near.length){badge.textContent='!';badge.style.display='inline-block';badge.style.background='var(--amber)';}else badge.style.display='none';}
+function checkBudgetAlerts(){
+  var cats=Object.keys(D.budgets),badge=document.getElementById('budgetBadge');
+  if(!cats.length){if(badge)badge.style.display='none';return;}
+  var spent={};
+  getExpenses().forEach(function(e){spent[e.cat]=(spent[e.cat]||0)+e.amt;});
+  var over=cats.filter(function(c){return (spent[c]||0)>D.budgets[c];});
+  var near=cats.filter(function(c){var u=spent[c]||0;return u<=D.budgets[c]&&u/D.budgets[c]>=0.85;});
+  if(badge){
+    if(over.length){badge.textContent=over.length;badge.style.display='inline-block';badge.style.background='var(--red)';}
+    else if(near.length){badge.textContent='!';badge.style.display='inline-block';badge.style.background='var(--amber)';}
+    else badge.style.display='none';
+  }
+  /* Show budget alert banner */
+  var alertBanner=document.getElementById('budgetAlertBanner');
+  var alertText=document.getElementById('budgetAlertText');
+  if(!alertBanner||!alertText)return;
+  if(over.length||near.length){
+    var msgs=[];
+    over.forEach(function(c){msgs.push('🔴 '+c+': '+fmt(spent[c]||0)+' / '+fmt(D.budgets[c])+' (over by '+fmt((spent[c]||0)-D.budgets[c])+')');});
+    near.forEach(function(c){msgs.push('🟡 '+c+': '+fmt(spent[c]||0)+' / '+fmt(D.budgets[c])+' ('+Math.round((spent[c]||0)/D.budgets[c]*100)+'%)');});
+    alertText.textContent=msgs.join(' · ');
+    alertBanner.style.display='flex';
+  } else {
+    alertBanner.style.display='none';
+  }
+}
 
 /* ═══ FIXED ═══ */
 function addFixed(){
@@ -2365,6 +2394,7 @@ function checkReminders(){
   var paid=getPaid();
   var pending=D.fixed.filter(function(f){return f.recurring&&paid.indexOf(f.id)<0&&(!f.skippedMonths||f.skippedMonths.indexOf(_ckm)<0);});
   var today=new Date().getDate();
+  /* Show bills due in next 7 days */
   var dueSoon=D.fixed.filter(function(f){
     if(!f.dueDay)return false;
     var diff=f.dueDay-today;
@@ -2376,7 +2406,8 @@ function checkReminders(){
     var dueStr=dueSoon.map(function(f){
       var acc=D.accounts.find(function(a){return a.id===f.accountId;});
       var accStr=acc?' ('+acc.name+')':'';
-      return f.name+accStr+(f.dueDay===today?' due TODAY':' due in '+(f.dueDay-today)+'d');
+      var diff=f.dueDay-today;
+      return f.name+accStr+(diff===0?' due TODAY':' due in '+diff+'d');
     }).join(' · ');
     msgs.push(dueStr);
   }
@@ -2811,8 +2842,20 @@ function renderNetWorth(){
   /* Net Worth Snapshot — save current value keyed by month */
   if(!D.config.nwSnapshots)D.config.nwSnapshots={};
   var snapKey=mk();
+  var prevSnapKey=Object.keys(D.config.nwSnapshots).sort().slice(-2,-1)[0];
+  var prevNW=prevSnapKey?D.config.nwSnapshots[prevSnapKey]:null;
   D.config.nwSnapshots[snapKey]=Math.round(netWorth);
   autoSave();
+  /* Show month-over-month change */
+  var nwChangeEl=document.getElementById('nw-change');
+  if(nwChangeEl&&prevNW!==null&&prevSnapKey!==snapKey){
+    var diff=netWorth-prevNW;
+    nwChangeEl.textContent=(diff>=0?'▲ +':' ▼ ')+fmt(Math.abs(diff))+' vs last month';
+    nwChangeEl.style.color=diff>=0?'var(--green)':'var(--red)';
+    nwChangeEl.style.display='block';
+  } else if(nwChangeEl){
+    nwChangeEl.style.display='none';
+  }
   /* Render trend chart */
   var snapKeys=Object.keys(D.config.nwSnapshots).sort();
   var snapVals=snapKeys.map(function(k){return D.config.nwSnapshots[k];});
