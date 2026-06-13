@@ -1922,7 +1922,7 @@ function renderAccounts(){
     var balDisplay=locked?'••••':fmt(bal);
     var spentDisplay=locked?'••••':fmt(spent);
     var salNoteDisplay=locked?'':salNote;
-    return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+lowWarn+salBadge+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">'+balDisplay+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+spentDisplay+'</div>'+salNoteDisplay+noteHtml+utilHtml+'<div style="display:flex;gap:6px;margin-top:8px"><button onclick="openAccountStatement(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">📋</button><button onclick="openEditAccount(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">✏️</button></div><button class="adel" onclick="confirmDelete('account','\''+a.id+'\'',a.name)">×</button></div>';}).join('');
+    return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+lowWarn+salBadge+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">'+balDisplay+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+spentDisplay+'</div>'+salNoteDisplay+noteHtml+utilHtml+'<div style="display:flex;gap:6px;margin-top:8px"><button onclick="openAccountStatement(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">📋</button><button onclick="openEditAccount(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">✏️</button></div><button class="adel" onclick="confirmDelete(\'account\',this.dataset.id,this.dataset.name)" data-id="'+a.id+'" data-name="'+esc(a.name)+'">×</button></div>';}).join('');
 }
 function populateAccSel(){var accs=D.accounts,sel=document.getElementById('expAcc');
   var fixAccSel=document.getElementById('fixAccId');
@@ -2126,7 +2126,7 @@ function renderExpenses(textFilter,dateFilter){
     var isReimb=e.tags&&(e.tags.toLowerCase().indexOf('#reimbursable')>-1||e.tags.toLowerCase().indexOf('reimbursable')>-1);
     var isReimbursed=e.tags&&e.tags.toLowerCase().indexOf('#reimbursed')>-1;
     var reimbBtn=isReimb&&!isReimbursed?'<button class="btn-ghost" style="padding:2px 6px;font-size:10px;color:var(--green)" onclick="markReimbursed(this.dataset.id)" data-id="'+e.id+'" title="Mark reimbursed">💸 Got paid</button>':'';
-    return '<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span>'+reimbBtn+'<button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="del-btn" onclick="confirmDelete('expense','\''+e.id+'\'',e.name)">×</button></div></div>';}).join('');
+    return '<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span>'+reimbBtn+'<button class="edit-btn" onclick="openEdit(\''+e.id+'\')">✏️</button><button class="del-btn" onclick="confirmDelete(\'expense\',this.dataset.id,this.dataset.name)" data-id="'+e.id+'" data-name="'+esc(e.name)+'">×</button></div></div>';}).join('');
   renderBudgetBars();checkBudgetAlerts();
 }
 
@@ -2410,7 +2410,7 @@ function renderFixed(){
     }
     var catTag=f.cat?'<span style="display:inline-block;background:var(--sur2);color:var(--tx3);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:5px">'+f.cat+'</span>':'';
     var skipLabel=f.skippedMonths&&f.skippedMonths.indexOf(mk())>-1?'Unskip':'Skip';
-    return '<div class="erow" style="flex-wrap:wrap"><div class="eleft"><div class="dot" style="background:var(--red)"></div><div><div class="ename">'+f.name+duePill+catTag+'</div><div class="emeta">'+f.freq+' · '+fmt(f.amt)+note+(f.freq!=='Monthly'?' (~'+fmt(Math.round(mo))+'/mo)':'')+(f.accountId?(' · '+(D.accounts.find(function(a){return a.id===f.accountId;})||{name:''}).name):'')+'</div></div></div><div class="eright">'+(f.recurring?(isPaid?'<span class="paid-badge">Paid</span>':'<button class="pend-badge" onclick="togglePaid(\''+f.id+'\')">Mark paid</button>'):'')+' <button class="fix-edit-btn" style="font-size:11px;padding:2px 6px" onclick="openPayHistory(\''+f.id+'\')">📋</button><button class="fix-edit-btn" style="font-size:11px;padding:2px 6px" onclick="skipThisMonth(\''+f.id+'\')">'+skipLabel+'</button><button class="fix-edit-btn" onclick="openEditFixed(\''+f.id+'\')">✏️</button><button class="del-btn" onclick="confirmDelete('fixed','\''+f.id+'\'',f.name)">×</button></div></div>';
+    return '<div class="erow" style="flex-wrap:wrap"><div class="eleft"><div class="dot" style="background:var(--red)"></div><div><div class="ename">'+f.name+duePill+catTag+'</div><div class="emeta">'+f.freq+' · '+fmt(f.amt)+note+(f.freq!=='Monthly'?' (~'+fmt(Math.round(mo))+'/mo)':'')+(f.accountId?(' · '+(D.accounts.find(function(a){return a.id===f.accountId;})||{name:''}).name):'')+'</div></div></div><div class="eright">'+(f.recurring?(isPaid?'<span class="paid-badge">Paid</span>':'<button class="pend-badge" onclick="togglePaid(\''+f.id+'\')">Mark paid</button>'):'')+' <button class="fix-edit-btn" style="font-size:11px;padding:2px 6px" onclick="openPayHistory(\''+f.id+'\')">📋</button><button class="fix-edit-btn" style="font-size:11px;padding:2px 6px" onclick="skipThisMonth(\''+f.id+'\')">'+skipLabel+'</button><button class="fix-edit-btn" onclick="openEditFixed(\''+f.id+'\')">✏️</button><button class="del-btn" onclick="confirmDelete(\'fixed\',this.dataset.id,this.dataset.name)" data-id="'+f.id+'" data-name="'+esc(f.name)+'">×</button></div></div>';
   }).join('');
   var badge=document.getElementById('pendingBadge'),pend=rec.filter(function(f){return paid.indexOf(f.id)<0;}).length;badge.textContent=pend;badge.style.display=pend>0?'inline-block':'none';
 }
@@ -2721,7 +2721,7 @@ function renderGoals(){
         +'</div>'
         +'<div style="display:flex;gap:6px">'
           +'<button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openEditGoal(\''+g.id+'\')">✏️ Edit</button>'
-          +'<button class="del-btn" onclick="confirmDelete('goal','\''+g.id+'\'',g.name)">×</button>'
+          +'<button class="del-btn" onclick="confirmDelete(\'goal\',this.dataset.id,this.dataset.name)" data-id="'+g.id+'" data-name="'+esc(g.name)+'">×</button>'
         +'</div>'
       +'</div>'
       /* Progress */
@@ -2863,7 +2863,7 @@ function renderNetWorth(){
   document.getElementById('nw-assets-list').innerHTML=assetRows.filter(function(r){return r.v>0;}).map(function(r){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px"><span>'+r.icon+' '+r.l+'</span><span style="font-family:\'DM Mono\',monospace;font-weight:500;color:var(--green)">'+fmt(r.v)+'</span></div>';}).join('')||'<p class="empty">No assets found.</p>';
   var liabEl=document.getElementById('nw-liab-list');
   if(!liabilities.length){liabEl.innerHTML='<p class="empty">No liabilities yet.</p>';return;}
-  liabEl.innerHTML=liabilities.map(function(l){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px"><span>'+l.name+'</span><div style="display:flex;align-items:center;gap:8px"><span style="font-family:\'DM Mono\',monospace;font-weight:500;color:var(--red)">'+fmt(l.amt)+'</span><button class="del-btn" onclick="confirmDelete('liability','\''+l.id+'\'',l.name)">×</button></div></div>';}).join('');
+  liabEl.innerHTML=liabilities.map(function(l){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px"><span>'+l.name+'</span><div style="display:flex;align-items:center;gap:8px"><span style="font-family:\'DM Mono\',monospace;font-weight:500;color:var(--red)">'+fmt(l.amt)+'</span><button class="del-btn" onclick="confirmDelete(\'liability\',this.dataset.id,this.dataset.name)" data-id="'+l.id+'" data-name="'+esc(l.name)+'">×</button></div></div>';}).join('');
   /* Net Worth Snapshot — save current value keyed by month */
   if(!D.config.nwSnapshots)D.config.nwSnapshots={};
   var snapKey=mk();
@@ -3295,7 +3295,8 @@ function exportReportRange(fromD,toD){
 var _pendingDelete=null;
 function confirmDelete(type, id, name){
   _pendingDelete={type:type, id:id};
-  document.getElementById('confirmDeleteTitle').textContent='Delete "'+name+'"?';
+  var displayName = name || id;
+  document.getElementById('confirmDeleteTitle').textContent='Delete "'+displayName+'"?';
   document.getElementById('confirmDeleteDesc').textContent='This will permanently remove this '+type+'. This cannot be undone.';
   document.getElementById('confirmDeleteModal').classList.add('show');
 }
@@ -4500,7 +4501,7 @@ function renderTransferList(){
     list.map(function(t){
       var fa=D.accounts.find(function(a){return a.id===t.fromId;}),ta=D.accounts.find(function(a){return a.id===t.toId;});
       var d=new Date(t.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-      return '<div class="erow"><div class="eleft"><span style="font-size:13px;margin-right:6px">↔</span><div><div class="ename">'+(fa?fa.name:'?')+' → '+(ta?ta.name:'?')+'</div><div class="emeta">'+d+(t.note?' · '+esc(t.note):'')+'</div></div></div><div class="eright"><span class="eamt" style="color:var(--blue)">'+fmt(t.amt)+'</span><button class="del-btn" onclick="confirmDelete('transfer',this.dataset.id,(fa?fa.name:'?')+' → '+(ta?ta.name:'?'))" data-id="'+t.id+'">×</button></div></div>';
+      return '<div class="erow"><div class="eleft"><span style="font-size:13px;margin-right:6px">↔</span><div><div class="ename">'+(fa?fa.name:'?')+' → '+(ta?ta.name:'?')+'</div><div class="emeta">'+d+(t.note?' · '+esc(t.note):'')+'</div></div></div><div class="eright"><span class="eamt" style="color:var(--blue)">'+fmt(t.amt)+'</span><button class="del-btn" onclick="confirmDelete(\'transfer\',this.dataset.id,this.dataset.name)" data-id="'+t.id+'" data-name="'+(fa?fa.name:'?')+' to '+(ta?ta.name:'?')+'">×</button></div></div>';
     }).join('')+moreBtn;
 }
 function deleteTransfer(id){
@@ -4672,7 +4673,7 @@ function renderExpensesRange(){
     var row='<div class="erow"><input type="checkbox" class="exp-check" onclick="toggleBulkSelect(\''+e.id+'\',this)" style="margin-right:4px"><div class="eleft"><div class="dot" style="background:'+c+'"></div><div style="min-width:0"><div class="ename">'+e.name+tagHtml+'</div><div class="emeta">'+d+' - '+e.cat+(acc?' - '+acc.name:'')+'</div>'+noteHtml+'</div></div><div class="eright"><span class="eamt">'+fmt(e.amt)+'</span>';
     row+='<button class="edit-btn" onclick="openEdit(this.dataset.id)" data-id="'+id+'">Edit</button>';
     if(e.tags&&e.tags.indexOf('reimbursable')>-1&&e.tags.indexOf('reimbursed')<0)row+='<button class="btn-ghost" style="padding:2px 6px;font-size:10px;color:var(--green)" onclick="markReimbursed(this.dataset.id)" data-id="'+id+'" title="Mark reimbursed">💸 Got paid</button>';
-    row+='<button class="del-btn" onclick="confirmDelete('expense',this.dataset.id,e.name)" data-id="'+id+'">x</button>';
+    row+='<button class="del-btn" onclick="confirmDelete(\'expense\',this.dataset.id,e.name)" data-id="'+id+'">x</button>';
     row+='</div></div>';
     return row;
   }).join('');
