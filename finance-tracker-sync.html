@@ -601,6 +601,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
       <select id="transferTo" style="min-width:130px"></select>
       <input type="number" id="transferAmt" placeholder="₹ Amount" style="max-width:130px">
       <input type="date" id="transferDate" style="max-width:145px">
+      <input type="text" id="transferNote" placeholder="Note (e.g. Ghar ke liye)" style="max-width:180px">
       <button class="btn" onclick="addTransfer()" style="background:var(--blue)">Transfer</button>
     </div>
     <div id="transferList" style="margin-top:8px"></div>
@@ -2505,9 +2506,9 @@ function showDayPanel(d){
     html+=transfers.map(function(t){
       var fromAcc=D.accounts.find(function(a){return a.id===t.fromId;});
       var toAcc=D.accounts.find(function(a){return a.id===t.toId;});
-      var fromName=fromAcc?fromAcc.name:(t.fromName||t.fromId||'?');
-      var toName=toAcc?toAcc.name:(t.toName||t.toId||'?');
-      return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--tx3)"></div><span class="ename">'+esc(fromName)+' → '+esc(toName)+'</span></div><span class="eamt">'+fmt(t.amt)+'</span></div>';
+      var fromName=fromAcc?fromAcc.name:(t.fromName||'?');
+      var toName=toAcc?toAcc.name:(t.toName||'?');
+      return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--tx3)"></div><div><span class="ename">'+esc(fromName)+' → '+esc(toName)+'</span>'+(t.note?'<span class="emeta">'+esc(t.note)+'</span>':'')+'</div></div><span class="eamt">'+fmt(t.amt)+'</span></div>';
     }).join('');
   }
   panel.innerHTML=html;
@@ -3151,6 +3152,23 @@ function exportExcelRange(fromD,toD){
     xi.push([e.month,new Date(e.date).toLocaleDateString('en-IN'),e.name,e.source,e.amt]);
   });
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(xi),'Extra Income');
+  /* Transfers sheet */
+  var tr=[['Date','From Account','To Account','Amount (₹)','Note']];
+  (D.transfers||[]).filter(function(t){
+    var d=new Date(t.date);return d>=fromD&&d<=toD;
+  }).sort(function(a,b){return new Date(b.date)-new Date(a.date);}).forEach(function(t){
+    var fa=D.accounts.find(function(a){return a.id===t.fromId;}),ta=D.accounts.find(function(a){return a.id===t.toId;});
+    tr.push([new Date(t.date).toLocaleDateString('en-IN'),fa?fa.name:(t.fromName||''),ta?ta.name:(t.toName||''),t.amt,t.note||'']);
+  });
+  if(tr.length>1)XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(tr),'Transfers');
+  /* Fixed Expenses sheet */
+  var fx2=[['Name','Amount (₹)','Frequency','Due Day','Category','Account','Status']];
+  var paidNow=getPaid();
+  (D.fixed||[]).forEach(function(f){
+    var acc=D.accounts.find(function(a){return a.id===f.accountId;});
+    fx2.push([f.name,f.amt,f.freq,f.dueDay||'',f.cat,acc?acc.name:'',paidNow.indexOf(f.id)>-1?'Paid':'Pending']);
+  });
+  if(fx2.length>1)XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(fx2),'Fixed Expenses');
   var label=fromD.toLocaleString('default',{month:'short',year:'numeric'})+'-to-'+toD.toLocaleString('default',{month:'short',year:'numeric'});
   XLSX.writeFile(wb,'finance-'+label+'.xlsx');
   showToast('Excel exported!','success');
@@ -3175,9 +3193,21 @@ function exportReportRange(fromD,toD){
   var mStr=fromD.toLocaleString('default',{month:'long',year:'numeric'})+' — '+toD.toLocaleString('default',{month:'long',year:'numeric'});
   var r=function(n){return '₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');};
   var hRows=hist.map(function(h){return '<tr><td>'+h.label+'</td><td>'+r(h.income)+'</td><td>'+r(h.fxd)+'</td><td>'+r(h.spent)+'</td><td style="color:#1D9E75">'+r(h.savings)+'</td><td style="color:'+(h.balance>=0?'#1D9E75':'#D85A30')+'">'+r(h.balance)+'</td></tr>';}).join('');
+  /* Transfers section */
+  var mTrans=(D.transfers||[]).filter(function(t){var d=new Date(t.date);return d>=fromD&&d<=toD;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  var transRows=mTrans.map(function(t){var fa=D.accounts.find(function(a){return a.id===t.fromId;}),ta=D.accounts.find(function(a){return a.id===t.toId;});return '<tr><td>'+new Date(t.date).toLocaleDateString('en-IN')+'</td><td>'+(fa?fa.name:(t.fromName||''))+'</td><td>'+(ta?ta.name:(t.toName||''))+'</td><td>'+(t.note||'—')+'</td><td style="color:#378ADD;font-family:monospace">'+r(t.amt)+'</td></tr>';}).join('');
+  /* Fixed expenses section */
+  var paidRep=getPaid();
+  var fixedRows=(D.fixed||[]).map(function(f){var acc=D.accounts.find(function(a){return a.id===f.accountId;});return '<tr><td>'+f.name+'</td><td>'+f.freq+'</td><td>'+(f.dueDay?f.dueDay+'th':'—')+'</td><td>'+(acc?acc.name:'—')+'</td><td style="color:'+(paidRep.indexOf(f.id)>-1?'#1D9E75':'#D85A30')+'">'+r(f.amt)+'</td><td>'+(paidRep.indexOf(f.id)>-1?'✓ Paid':'Pending')+'</td></tr>';}).join('');
   var sD='var H='+JSON.stringify(hist)+';var CL='+JSON.stringify(cL)+';var CD='+JSON.stringify(cD)+';var CC2='+JSON.stringify(cC)+';';
   var sC='try{if(H.length>=1)new Chart(document.getElementById("hc"),{type:"bar",data:{labels:H.map(function(d){return d.label;}),datasets:[{label:"Income",data:H.map(function(d){return d.income;}),backgroundColor:"#378ADD",borderRadius:4},{label:"Expenses",data:H.map(function(d){return d.fxd+d.spent;}),backgroundColor:"#D85A30",borderRadius:4},{label:"Savings",data:H.map(function(d){return d.savings;}),backgroundColor:"#1D9E75",borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},scales:{x:{grid:{display:false}},y:{ticks:{callback:function(v){return"₹"+(v>=100000?(v/100000).toFixed(0)+"L":v>=1000?(v/1000).toFixed(0)+"K":v);}}}}}});if(CL.length)new Chart(document.getElementById("cc"),{type:"doughnut",data:{labels:CL,datasets:[{data:CD,backgroundColor:CC2,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:"62%",plugins:{legend:{display:false}}}});}catch(e){}';
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report '+mStr+'</title><scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></scr'+'ipt><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#F7F6F3;color:#1A1A18;font-size:15px}.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem}h1{font-size:24px;font-weight:700;margin-bottom:4px}.sub{color:#6B6A65;font-size:14px;margin-bottom:2rem}.sec{margin-bottom:2rem}.stitle{font-size:11px;font-weight:600;text-transform:uppercase;color:#9E9C97;margin-bottom:10px}.card{background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:1.25rem 1.5rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}.ch{position:relative;height:200px}table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:10px;font-weight:600;text-transform:uppercase;color:#9E9C97;text-align:left;padding:6px 8px;border-bottom:1px solid #E4E2DA}td{padding:8px;border-bottom:1px solid #E4E2DA;font-family:monospace}td:first-child{font-family:inherit;color:#6B6A65}.pbtn{position:fixed;bottom:24px;right:24px;background:#1A1A18;color:#fff;border:none;border-radius:99px;padding:12px 24px;font-size:14px;cursor:pointer}@media print{.pbtn{display:none}}</style></head><body><div class="page"><h1>💰 Finance Report</h1><div class="sub">'+mStr+'</div><div class="sec"><div class="stitle">Overview</div><div class="card"><div class="ch"><canvas id="hc"></canvas></div></div></div><div class="two"><div class="card"><div class="stitle">By Category</div><div class="ch"><canvas id="cc"></canvas></div></div></div><div class="sec"><div class="stitle">Monthly Summary</div><div class="card"><table><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div></div><button class="pbtn" onclick="window.print()">🖨 Print PDF</button><scr'+'ipt>'+sD+sC+'<\/script></body></html>';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report '+mStr+'</title><scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></scr'+'ipt><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#F7F6F3;color:#1A1A18;font-size:15px}.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem}h1{font-size:24px;font-weight:700;margin-bottom:4px}.sub{color:#6B6A65;font-size:14px;margin-bottom:2rem}.sec{margin-bottom:2rem}.stitle{font-size:11px;font-weight:600;text-transform:uppercase;color:#9E9C97;margin-bottom:10px}.card{background:#fff;border:1px solid #E4E2DA;border-radius:12px;padding:1.25rem 1.5rem}.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}.ch{position:relative;height:200px}table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:10px;font-weight:600;text-transform:uppercase;color:#9E9C97;text-align:left;padding:6px 8px;border-bottom:1px solid #E4E2DA}td{padding:8px;border-bottom:1px solid #E4E2DA}td:first-child{color:#6B6A65}.pbtn{position:fixed;bottom:24px;right:24px;background:#1A1A18;color:#fff;border:none;border-radius:99px;padding:12px 24px;font-size:14px;cursor:pointer}@media print{.pbtn{display:none}}</style></head><body><div class="page"><h1>💰 Finance Report</h1><div class="sub">'+mStr+'</div>'
+    +'<div class="sec"><div class="stitle">Overview</div><div class="card"><div class="ch"><canvas id="hc"></canvas></div></div></div>'
+    +'<div class="two"><div class="card"><div class="stitle">By Category</div><div class="ch"><canvas id="cc"></canvas></div></div></div>'
+    +'<div class="sec"><div class="stitle">Monthly Summary</div><div class="card"><table><thead><tr><th>Month</th><th>Income</th><th>Fixed</th><th>Spent</th><th>Savings</th><th>Balance</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div>'
+    +(transRows?'<div class="sec"><div class="stitle">🔄 Transfers</div><div class="card"><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Note</th><th>Amount</th></tr></thead><tbody>'+transRows+'</tbody></table></div></div>':'')
+    +'<div class="sec"><div class="stitle">📌 Fixed Expenses</div><div class="card"><table><thead><tr><th>Name</th><th>Frequency</th><th>Due Day</th><th>Account</th><th>Amount</th><th>Status</th></tr></thead><tbody>'+fixedRows+'</tbody></table></div></div>'
+    +'</div><button class="pbtn" onclick="window.print()">🖨 Print PDF</button><scr'+'ipt>'+sD+sC+'<\/script></body></html>';
   var label=fromD.toLocaleString('default',{month:'short',year:'numeric'})+'-to-'+toD.toLocaleString('default',{month:'short',year:'numeric'});
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download='report-'+label+'.html';a.click();
   showToast('Report downloaded!','success');
@@ -4242,16 +4272,18 @@ function addTransfer(){
   var toId=document.getElementById('transferTo').value;
   var amt=parseFloat(document.getElementById('transferAmt').value);
   var date=document.getElementById('transferDate').value||todayStr();
+  var note=(document.getElementById('transferNote').value||'').trim();
   if(!fromId||!toId){showToast('Select accounts','error');return;}
   if(fromId===toId){showToast('Cannot transfer to same account','error');return;}
   if(isNaN(amt)||amt<=0){showToast('Enter amount','error');return;}
   if(!D.transfers)D.transfers=[];
-  D.transfers.push({id:Date.now().toString(),fromId:fromId,toId:toId,amt:amt,date:date});
+  var fa=D.accounts.find(function(a){return a.id===fromId;}),ta=D.accounts.find(function(a){return a.id===toId;});
+  D.transfers.push({id:Date.now().toString(),fromId:fromId,toId:toId,fromName:fa?fa.name:'',toName:ta?ta.name:'',amt:amt,date:date,note:note});
   autoSave();
   document.getElementById('transferAmt').value='';
   document.getElementById('transferDate').value=todayStr();
-  var fa=D.accounts.find(function(a){return a.id===fromId;}),ta=D.accounts.find(function(a){return a.id===toId;});
-  showToast(fmt(amt)+' transferred '+(fa?fa.name:'')+'→'+(ta?ta.name:''),'success');
+  document.getElementById('transferNote').value='';
+  showToast(fmt(amt)+' transferred '+(fa?fa.name:'')+'→'+(ta?ta.name:'')+(note?' ('+note+')':''),'success');
   renderAccounts();renderTransferList();
 }
 function renderTransferList(){
@@ -4263,7 +4295,7 @@ function renderTransferList(){
     list.map(function(t){
       var fa=D.accounts.find(function(a){return a.id===t.fromId;}),ta=D.accounts.find(function(a){return a.id===t.toId;});
       var d=new Date(t.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-      return '<div class="erow"><div class="eleft"><span style="font-size:13px;margin-right:6px">↔</span><div><div class="ename">'+(fa?fa.name:'?')+' → '+(ta?ta.name:'?')+'</div><div class="emeta">'+d+'</div></div></div><div class="eright"><span class="eamt" style="color:var(--blue)">'+fmt(t.amt)+'</span><button class="del-btn" onclick="deleteTransfer(this.dataset.id)" data-id="'+t.id+'">×</button></div></div>';
+      return '<div class="erow"><div class="eleft"><span style="font-size:13px;margin-right:6px">↔</span><div><div class="ename">'+(fa?fa.name:'?')+' → '+(ta?ta.name:'?')+'</div><div class="emeta">'+d+(t.note?' · '+esc(t.note):'')+'</div></div></div><div class="eright"><span class="eamt" style="color:var(--blue)">'+fmt(t.amt)+'</span><button class="del-btn" onclick="deleteTransfer(this.dataset.id)" data-id="'+t.id+'">×</button></div></div>';
     }).join('')+moreBtn;
 }
 function deleteTransfer(id){
