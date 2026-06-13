@@ -607,7 +607,7 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
   </div>
 </div>
 <div class="tab-content" id="tab-calendar">
-  <div class="card"><div class="card-hd"><span class="ctitle">Spending calendar</span><span style="font-size:11px;color:var(--tx3)">Tap a day for details</span></div><div class="calgrid" id="calGrid"></div><div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap"><span style="font-size:11px;color:var(--tx3);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>Expenses</span><span style="font-size:11px;color:var(--tx3);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>Income</span><span style="font-size:11px;color:var(--tx3);display:flex;align-items:center;gap:4px">📌 Fixed bill due</span></div></div>
+  <div class="card"><div class="card-hd"><span class="ctitle">Spending calendar</span><span style="font-size:11px;color:var(--tx3)">Tap a day for details</span></div><div class="calgrid" id="calGrid"></div><div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap"><span style="font-size:11px;color:var(--tx3);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>Expense</span><span style="font-size:11px;color:var(--tx3);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>Income</span><span style="font-size:11px;color:var(--tx3)">📌 Fixed</span><span style="font-size:11px;color:var(--tx3)">💳 Lent</span><span style="font-size:11px;color:var(--tx3)">🔄 Transfer</span></div></div>
   <div class="daypanel" id="dayPanel" style="display:none"></div>
 </div>
 <div class="tab-content" id="tab-expenses">
@@ -2390,24 +2390,42 @@ function checkReminders(){
 /* ═══ CALENDAR ═══ */
 function renderCalendar(){
   var exps=getExpenses(),year=curDate.getFullYear(),month=curDate.getMonth(),today=new Date();
-  var dayT={};exps.forEach(function(e){
-    var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
-    dayT[day]=(dayT[day]||0)+e.amt;
-  });
-  var dayInc={};getExtraIncome().forEach(function(e){
-    var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
-    dayInc[day]=(dayInc[day]||0)+e.amt;
-  });
-  /* Fixed expenses by due day */
-  var dayFixed={};
   var curM=year+'-'+String(month+1).padStart(2,'0');
   var paid=getPaid();
-  (D.fixed||[]).forEach(function(f){
+
+  /* Expenses by day */
+  var dayT={};exps.forEach(function(e){
+    var day=parseInt(e.date.slice(8,10));
+    dayT[day]=(dayT[day]||0)+e.amt;
+  });
+  /* Income by day */
+  var dayInc={};(D.extraIncome||[]).filter(function(e){return e.month===curM;}).forEach(function(e){
+    var day=parseInt(e.date.slice(8,10));
+    dayInc[day]=(dayInc[day]||0)+e.amt;
+  });
+  /* Fixed by due day */
+  var dayFixed={};(D.fixed||[]).forEach(function(f){
     if(!f.dueDay||!f.recurring)return;
     dayFixed[f.dueDay]=dayFixed[f.dueDay]||[];
     dayFixed[f.dueDay].push(f);
   });
-  var maxA=Math.max.apply(null,Object.values(dayT).concat([1])),firstDay=new Date(year,month,1).getDay(),dim=new Date(year,month+1,0).getDate(),prev=new Date(year,month,0).getDate();
+  /* Lent by day */
+  var dayLent={};(D.lent||[]).forEach(function(l){
+    if(!l.date)return;
+    var lm=l.date.slice(0,7);if(lm!==curM)return;
+    var day=parseInt(l.date.slice(8,10));
+    dayLent[day]=(dayLent[day]||0)+l.amt;
+  });
+  /* Transfers by day */
+  var dayTrans={};(D.transfers||[]).forEach(function(t){
+    if(!t.date)return;
+    var tm=t.date.slice(0,7);if(tm!==curM)return;
+    var day=parseInt(t.date.slice(8,10));
+    dayTrans[day]=(dayTrans[day]||0)+1;
+  });
+
+  var maxA=Math.max.apply(null,Object.values(dayT).concat([1]));
+  var firstDay=new Date(year,month,1).getDay(),dim=new Date(year,month+1,0).getDate(),prev=new Date(year,month,0).getDate();
   var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var h=days.map(function(d){return '<div class="calhd">'+d+'</div>';}).join('');
   for(var i=firstDay-1;i>=0;i--)h+='<div class="calday other"><div class="cdnum">'+(prev-i)+'</div></div>';
@@ -2415,55 +2433,80 @@ function renderCalendar(){
     var amt=dayT[d]||0,isT=today.getFullYear()===year&&today.getMonth()===month&&today.getDate()===d,isSel=selDay===d;
     var bg='',tc='var(--tx2)';
     if(amt>0){var r=amt/maxA;bg=r<.33?'rgba(29,158,117,.12)':r<.66?'rgba(186,117,23,.15)':'rgba(216,90,48,.15)';tc=r<.33?'var(--green)':r<.66?'var(--amber)':'var(--red)';}
-    var fixedDot=(dayFixed[d]&&dayFixed[d].length)?'<div style="font-size:8px;color:var(--amber);margin-top:1px">📌'+dayFixed[d].length+'</div>':'';
     h+='<div class="calday'+(isT?' today':'')+(isSel?' selected':'')+'" style="background:'+(isSel?'':bg)+'" onclick="selectDay('+d+')">'
       +'<div class="cdnum" style="color:'+(isT?'var(--blue)':'var(--tx2)')+'">'+d+'</div>'
       +(amt>0?'<div class="cdamt" style="color:'+tc+'">'+fmt(amt)+'</div>':'')
       +(dayInc[d]>0?'<div class="cdamt" style="color:var(--green);font-size:8px">+'+fmt(dayInc[d])+'</div>':'')
-      +fixedDot
+      +(dayFixed[d]?'<div style="font-size:8px;color:var(--amber)">📌'+dayFixed[d].length+'</div>':'')
+      +(dayLent[d]?'<div style="font-size:8px;color:var(--blue)">💳</div>':'')
+      +(dayTrans[d]?'<div style="font-size:8px;color:var(--tx3)">🔄</div>':'')
       +'</div>';
   }
-  var rem=(firstDay+dim)%7===0?0:7-(firstDay+dim)%7;for(var d2=1;d2<=rem;d2++)h+='<div class="calday other"><div class="cdnum">'+d2+'</div></div>';
-  document.getElementById('calGrid').innerHTML=h;if(selDay)showDayPanel(selDay);
+  var rem=(firstDay+dim)%7===0?0:7-(firstDay+dim)%7;
+  for(var d2=1;d2<=rem;d2++)h+='<div class="calday other"><div class="cdnum">'+d2+'</div></div>';
+  document.getElementById('calGrid').innerHTML=h;
+  if(selDay)showDayPanel(selDay);
 }
 function selectDay(d){selDay=selDay===d?null:d;renderCalendar();if(!selDay)document.getElementById('dayPanel').style.display='none';}
 function showDayPanel(d){
-  var exps=getExpenses().filter(function(e){
-    var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
-    return day===d;
-  });
-  var incs=(D.extraIncome||[]).filter(function(e){
-    if(!e.month||(e.month!==curDate.getFullYear()+'-'+String(curDate.getMonth()+1).padStart(2,'0')))return false;
-    var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
-    return day===d;
-  });
+  var curM=curDate.getFullYear()+'-'+String(curDate.getMonth()+1).padStart(2,'0');
+  var exps=getExpenses().filter(function(e){return parseInt(e.date.slice(8,10))===d;});
+  var incs=(D.extraIncome||[]).filter(function(e){return e.month===curM&&parseInt(e.date.slice(8,10))===d;});
   var fixedDue=(D.fixed||[]).filter(function(f){return f.dueDay===d&&f.recurring;});
+  var lents=(D.lent||[]).filter(function(l){return l.date&&l.date.slice(0,7)===curM&&parseInt(l.date.slice(8,10))===d;});
+  var transfers=(D.transfers||[]).filter(function(t){return t.date&&t.date.slice(0,7)===curM&&parseInt(t.date.slice(8,10))===d;});
   var paid=getPaid();
   var panel=document.getElementById('dayPanel');
   var ds=new Date(curDate.getFullYear(),curDate.getMonth(),d).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
-  if(!exps.length&&!incs.length&&!fixedDue.length){
+  if(!exps.length&&!incs.length&&!fixedDue.length&&!lents.length&&!transfers.length){
     panel.innerHTML='<div style="font-size:13px;color:var(--tx3)">'+ds+' — no activity.</div>';
-  } else {
-    var total=exps.reduce(function(s,e){return s+e.amt;},0);
-    var totalInc=incs.reduce(function(s,e){return s+e.amt;},0);
-    panel.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:13px;font-weight:600">'+ds+'</span>'
-      +'<span style="font-size:12px">'+(totalInc>0?'<span style="color:var(--green);font-family:monospace">+'+fmt(totalInc)+'</span> ':'')+(total>0?'<span style="color:var(--red);font-family:monospace">-'+fmt(total)+'</span>':'')+'</span></div>'
-      /* Income entries */
-      +(incs.length?'<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--green);margin-bottom:4px;letter-spacing:.05em">💰 Income</div>'+incs.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--green)"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.source+'</span></div><span class="eamt" style="color:var(--green)">+'+fmt(e.amt)+'</span></div>';}).join(''):'')
-      /* Expense entries */
-      +(exps.length?'<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--red);margin-bottom:4px;margin-top:'+(incs.length?'10px':'0')+'letter-spacing:.05em">💸 Expenses</div>'+exps.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+(getCatColor(e.cat))+'"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.cat+'</span></div><span class="eamt" style="color:var(--red)">-'+fmt(e.amt)+'</span></div>';}).join(''):'')
-      /* Fixed due */
-      +(fixedDue.length?'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bdr)"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--amber);margin-bottom:6px;letter-spacing:.05em">📌 Fixed Bills Due</div>'
-        +fixedDue.map(function(f){
-          var isPaid=paid.indexOf(f.id)>-1;
-          return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--amber)"></div><span class="ename">'+esc(f.name)+'</span><span class="emeta">'+f.freq+'</span></div>'
-            +'<div style="display:flex;align-items:center;gap:8px">'
-            +(isPaid?'<span style="background:var(--gbg);color:var(--green);font-size:10px;font-weight:600;padding:1px 6px;border-radius:99px">✓ Paid</span>':'<span style="background:var(--abg);color:var(--amber);font-size:10px;font-weight:600;padding:1px 6px;border-radius:99px">Due</span>')
-            +'<span class="eamt">'+fmt(f.amt)+'</span>'
-            +'</div></div>';
-        }).join('')
-      +'</div>':'');
+    panel.style.display='block';return;
   }
+  var total=exps.reduce(function(s,e){return s+e.amt;},0);
+  var totalInc=incs.reduce(function(s,e){return s+e.amt;},0);
+  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    +'<span style="font-size:13px;font-weight:600">'+ds+'</span>'
+    +'<span style="font-size:12px;display:flex;gap:8px">'
+    +(totalInc>0?'<span style="color:var(--green);font-family:monospace">+'+fmt(totalInc)+'</span>':'')
+    +(total>0?'<span style="color:var(--red);font-family:monospace">-'+fmt(total)+'</span>':'')
+    +'</span></div>';
+  /* Income */
+  if(incs.length){
+    html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--green);margin-bottom:4px">💰 Income</div>';
+    html+=incs.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--green)"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.source+'</span></div><span class="eamt" style="color:var(--green)">+'+fmt(e.amt)+'</span></div>';}).join('');
+  }
+  /* Expenses */
+  if(exps.length){
+    html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--red);margin-bottom:4px;'+(incs.length?'margin-top:10px':'')+'">💸 Expenses</div>';
+    html+=exps.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+(getCatColor(e.cat))+'"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.cat+'</span></div><span class="eamt" style="color:var(--red)">-'+fmt(e.amt)+'</span></div>';}).join('');
+  }
+  /* Fixed bills due */
+  if(fixedDue.length){
+    html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--amber);margin-bottom:4px;margin-top:10px">📌 Fixed Bills Due</div>';
+    html+=fixedDue.map(function(f){
+      var isPaid=paid.indexOf(f.id)>-1;
+      return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--amber)"></div><span class="ename">'+esc(f.name)+'</span><span class="emeta">'+f.freq+'</span></div>'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+        +(isPaid?'<span style="background:var(--gbg);color:var(--green);font-size:10px;padding:1px 6px;border-radius:99px">✓ Paid</span>':'<span style="background:var(--abg);color:var(--amber);font-size:10px;padding:1px 6px;border-radius:99px">Due</span>')
+        +'<span class="eamt">'+fmt(f.amt)+'</span></div></div>';
+    }).join('');
+  }
+  /* Lent */
+  if(lents.length){
+    html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--blue);margin-bottom:4px;margin-top:10px">💳 Lent</div>';
+    html+=lents.map(function(l){
+      var acc=D.accounts.find(function(a){return a.id===l.fromAccId;});
+      return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--blue)"></div><span class="ename">'+esc(l.name)+'</span><span class="emeta">'+(acc?acc.name:'')+'</span></div><span class="eamt" style="color:var(--blue)">'+fmt(l.amt)+'</span></div>';
+    }).join('');
+  }
+  /* Transfers */
+  if(transfers.length){
+    html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:4px;margin-top:10px">🔄 Transfers</div>';
+    html+=transfers.map(function(t){
+      return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--tx3)"></div><span class="ename">'+esc(t.fromName)+' → '+esc(t.toName)+'</span></div><span class="eamt">'+fmt(t.amt)+'</span></div>';
+    }).join('');
+  }
+  panel.innerHTML=html;
   panel.style.display='block';
 }
 
