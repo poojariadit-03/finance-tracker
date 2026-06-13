@@ -4218,20 +4218,20 @@ function checkDueDayAutoPay(){
   var autoPaidCount=0;
   D.fixed.forEach(function(f){
     if(!f.recurring||!f.dueDay||f.freq!=='Monthly')return;
-    if(paid.indexOf(f.id)>-1)return;
+    if(paid.indexOf(f.id)>-1)return; /* already paid */
     if(f.skippedMonths&&f.skippedMonths.indexOf(m)>-1)return;
-  
-    if(todayDate!==f.dueDay)return;
+    if(todayDate<f.dueDay)return; /* due date not reached yet */
+    /* Auto mark as paid */
     paid.push(f.id);
-    var alreadyLogged=D.expenses.some(function(e){return e.month===m&&e.name===f.name&&e.amt===f.amt&&new Date(e.date).getDate()===todayDate;});
-    if(!alreadyLogged){
-      var parts=m.split('-');
-      var ed=new Date(parseInt(parts[0]),parseInt(parts[1])-1,todayDate,12,0,0).toISOString();
-      D.expenses.push({id:Date.now().toString()+'_dp_'+f.id,date:ed,month:m,name:f.name,cat:f.cat||'Utilities',amt:f.amt,accountId:f.accountId||(D.accounts.length?D.accounts[0].id:''),note:'Auto-paid on due date',tags:''});
-    }
     autoPaidCount++;
   });
-  if(autoPaidCount>0){D.paid[m]=paid;autoSave();renderFixed();renderExpenses();recalc();showToast(autoPaidCount+' fixed expense'+(autoPaidCount>1?'s':'')+' auto-paid today!','success');}
+  if(autoPaidCount>0){
+    D.paid[m]=paid;
+    autoSave();
+    renderFixed();
+    recalc();
+    showToast(autoPaidCount+' fixed expense'+(autoPaidCount>1?'s':'')+' auto-marked paid ✓','success');
+  }
 }
 
 function initDefaults(){
