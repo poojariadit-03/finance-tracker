@@ -3161,18 +3161,6 @@ function renderWeeklySummary(){
   document.getElementById('weeklySummary').innerHTML=h;
 }
 /* -- AUTO LOG FIXED -- */
-function autoLogFixed(){
-  /* Fixed expenses should NEVER be in the expenses list — they are counted
-     separately via fixedMonthly(). Remove any previously auto-logged entries. */
-  var before=D.expenses.length;
-  D.expenses=D.expenses.filter(function(e){
-    return !(e.id&&e.id.indexOf('_auto')>-1) && !(e.note==='Auto-logged');
-  });
-  if(D.expenses.length<before){
-    autoSave();renderExpenses();recalc();
-    showToast('Removed '+(before-D.expenses.length)+' duplicate fixed expense entries','info');
-  }
-}
 /* -- EDIT EXPENSE -- */
 var editingId=null;
 function openEdit(id){
@@ -4265,7 +4253,7 @@ function renderAll(){
   }
   var salDay=document.getElementById('salaryCreditDay');if(salDay&&D.config.salaryCreditDay)salDay.value=D.config.salaryCreditDay;
   renderAccounts();populateAccSel();populateTransferSelects();
-  if(document.getElementById('fixedSummary'))renderFixedSummary();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();autoLogFixed();
+  if(document.getElementById('fixedSummary'))renderFixedSummary();renderFixed();renderExpenses();renderGoals();recalc();checkReminders();renderBudgetBars();checkBudgetAlerts();renderWeeklySummary();
   renderIncSrcBtns();renderExtraIncome();checkSavingsStreak();checkMonthlyReset();checkAutoContribs();populateLentAccSel();
   applyTheme(D.config.theme||'auto');applyFontSize(D.config.fontSize||'normal');updateLentBadge();renderLent();
   var incDt=document.getElementById('incDate');if(incDt)incDt.value=todayStr();
