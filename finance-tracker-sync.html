@@ -3632,6 +3632,9 @@ function toggleBalanceDropdown(){
   },10);
 }
 function getAccountBalance(accountId){
+  var today=new Date();
+  var todayDate=today.getDate();
+  var curMonth=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
   var spent=D.expenses.filter(function(e){return e.accountId===accountId;}).reduce(function(s,e){return s+e.amt;},0);
   var incIn=(D.extraIncome||[]).filter(function(e){return e.accountId===accountId;}).reduce(function(s,e){return s+e.amt;},0);
   var tIn=(D.transfers||[]).filter(function(t){return t.toId===accountId;}).reduce(function(s,t){return s+t.amt;},0);
@@ -3639,7 +3642,22 @@ function getAccountBalance(accountId){
   var sal=getSalaryCredits(accountId);
   var acc=D.accounts.find(function(a){return a.id===accountId;});
   if(!acc)return 0;
-  return acc.openingBalance+incIn+sal+tIn-tOut-spent;
+  /* Deduct fixed expenses only after their due date this month */
+  var fixedDeducted=(D.fixed||[]).filter(function(f){
+    if(f.accountId!==accountId)return false;
+    if(!f.recurring)return false;
+    /* If due day set and today is before due day — not deducted yet */
+    if(f.dueDay&&f.dueDay>todayDate)return false;
+    return true;
+  }).reduce(function(s,f){
+    /* Monthly amount only */
+    if(f.freq==='Monthly')return s+f.amt;
+    if(f.freq==='Daily')return s+f.amt*todayDate;
+    if(f.freq==='Weekly')return s+f.amt*Math.floor(todayDate/7);
+    if(f.freq==='Yearly')return s+(today.getMonth()===0?f.amt:0);
+    return s+f.amt;
+  },0);
+  return acc.openingBalance+incIn+sal+tIn-tOut-spent-fixedDeducted;
 }
 function populateLentAccSel(){
   var sel=document.getElementById('lentFromAcc');
