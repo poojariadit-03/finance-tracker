@@ -2503,7 +2503,11 @@ function showDayPanel(d){
   if(transfers.length){
     html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:4px;margin-top:10px">🔄 Transfers</div>';
     html+=transfers.map(function(t){
-      return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--tx3)"></div><span class="ename">'+esc(t.fromName)+' → '+esc(t.toName)+'</span></div><span class="eamt">'+fmt(t.amt)+'</span></div>';
+      var fromAcc=D.accounts.find(function(a){return a.id===t.fromId;});
+      var toAcc=D.accounts.find(function(a){return a.id===t.toId;});
+      var fromName=fromAcc?fromAcc.name:(t.fromName||t.fromId||'?');
+      var toName=toAcc?toAcc.name:(t.toName||t.toId||'?');
+      return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--tx3)"></div><span class="ename">'+esc(fromName)+' → '+esc(toName)+'</span></div><span class="eamt">'+fmt(t.amt)+'</span></div>';
     }).join('');
   }
   panel.innerHTML=html;
