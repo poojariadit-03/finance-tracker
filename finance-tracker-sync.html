@@ -3155,10 +3155,13 @@ function exportExcelRange(fromD,toD){
   /* Transfers sheet */
   var tr=[['Date','From Account','To Account','Amount (₹)','Note']];
   (D.transfers||[]).filter(function(t){
-    var d=new Date(t.date);return d>=fromD&&d<=toD;
+    if(!t.date)return false;
+    var tDate=t.date.slice(0,7); /* YYYY-MM */
+    return mKeys.indexOf(tDate)>-1;
   }).sort(function(a,b){return new Date(b.date)-new Date(a.date);}).forEach(function(t){
     var fa=D.accounts.find(function(a){return a.id===t.fromId;}),ta=D.accounts.find(function(a){return a.id===t.toId;});
-    tr.push([new Date(t.date).toLocaleDateString('en-IN'),fa?fa.name:(t.fromName||''),ta?ta.name:(t.toName||''),t.amt,t.note||'']);
+    var dispDate=t.date.length>10?new Date(t.date).toLocaleDateString('en-IN'):new Date(t.date+'T12:00:00').toLocaleDateString('en-IN');
+    tr.push([dispDate,fa?fa.name:(t.fromName||''),ta?ta.name:(t.toName||''),t.amt,t.note||'']);
   });
   if(tr.length>1)XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(tr),'Transfers');
   /* Fixed Expenses sheet */
@@ -3194,8 +3197,15 @@ function exportReportRange(fromD,toD){
   var r=function(n){return '₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');};
   var hRows=hist.map(function(h){return '<tr><td>'+h.label+'</td><td>'+r(h.income)+'</td><td>'+r(h.fxd)+'</td><td>'+r(h.spent)+'</td><td style="color:#1D9E75">'+r(h.savings)+'</td><td style="color:'+(h.balance>=0?'#1D9E75':'#D85A30')+'">'+r(h.balance)+'</td></tr>';}).join('');
   /* Transfers section */
-  var mTrans=(D.transfers||[]).filter(function(t){var d=new Date(t.date);return d>=fromD&&d<=toD;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
-  var transRows=mTrans.map(function(t){var fa=D.accounts.find(function(a){return a.id===t.fromId;}),ta=D.accounts.find(function(a){return a.id===t.toId;});return '<tr><td>'+new Date(t.date).toLocaleDateString('en-IN')+'</td><td>'+(fa?fa.name:(t.fromName||''))+'</td><td>'+(ta?ta.name:(t.toName||''))+'</td><td>'+(t.note||'—')+'</td><td style="color:#378ADD;font-family:monospace">'+r(t.amt)+'</td></tr>';}).join('');
+  var mTrans=(D.transfers||[]).filter(function(t){
+    if(!t.date)return false;
+    return mKeys.indexOf(t.date.slice(0,7))>-1;
+  }).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  var transRows=mTrans.map(function(t){
+    var fa=D.accounts.find(function(a){return a.id===t.fromId;}),ta=D.accounts.find(function(a){return a.id===t.toId;});
+    var dispDate=t.date.length>10?new Date(t.date).toLocaleDateString('en-IN'):new Date(t.date+'T12:00:00').toLocaleDateString('en-IN');
+    return '<tr><td>'+dispDate+'</td><td>'+(fa?fa.name:(t.fromName||''))+'</td><td>'+(ta?ta.name:(t.toName||''))+'</td><td>'+(t.note||'—')+'</td><td style="color:#378ADD;font-family:monospace">'+r(t.amt)+'</td></tr>';
+  }).join('');
   /* Fixed expenses section */
   var paidRep=getPaid();
   var fixedRows=(D.fixed||[]).map(function(f){var acc=D.accounts.find(function(a){return a.id===f.accountId;});return '<tr><td>'+f.name+'</td><td>'+f.freq+'</td><td>'+(f.dueDay?f.dueDay+'th':'—')+'</td><td>'+(acc?acc.name:'—')+'</td><td style="color:'+(paidRep.indexOf(f.id)>-1?'#1D9E75':'#D85A30')+'">'+r(f.amt)+'</td><td>'+(paidRep.indexOf(f.id)>-1?'✓ Paid':'Pending')+'</td></tr>';}).join('');
