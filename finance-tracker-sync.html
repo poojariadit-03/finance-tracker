@@ -2390,7 +2390,6 @@ function checkReminders(){
 /* ═══ CALENDAR ═══ */
 function renderCalendar(){
   var exps=getExpenses(),year=curDate.getFullYear(),month=curDate.getMonth(),today=new Date();
-  /* Use date string slice to avoid timezone issues */
   var dayT={};exps.forEach(function(e){
     var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
     dayT[day]=(dayT[day]||0)+e.amt;
@@ -2399,11 +2398,31 @@ function renderCalendar(){
     var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
     dayInc[day]=(dayInc[day]||0)+e.amt;
   });
+  /* Fixed expenses by due day */
+  var dayFixed={};
+  var curM=year+'-'+String(month+1).padStart(2,'0');
+  var paid=getPaid();
+  (D.fixed||[]).forEach(function(f){
+    if(!f.dueDay||!f.recurring)return;
+    dayFixed[f.dueDay]=dayFixed[f.dueDay]||[];
+    dayFixed[f.dueDay].push(f);
+  });
   var maxA=Math.max.apply(null,Object.values(dayT).concat([1])),firstDay=new Date(year,month,1).getDay(),dim=new Date(year,month+1,0).getDate(),prev=new Date(year,month,0).getDate();
   var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var h=days.map(function(d){return '<div class="calhd">'+d+'</div>';}).join('');
   for(var i=firstDay-1;i>=0;i--)h+='<div class="calday other"><div class="cdnum">'+(prev-i)+'</div></div>';
-  for(var d=1;d<=dim;d++){var amt=dayT[d]||0,isT=today.getFullYear()===year&&today.getMonth()===month&&today.getDate()===d,isSel=selDay===d;var bg='',tc='var(--tx2)';if(amt>0){var r=amt/maxA;bg=r<.33?'rgba(29,158,117,.12)':r<.66?'rgba(186,117,23,.15)':'rgba(216,90,48,.15)';tc=r<.33?'var(--green)':r<.66?'var(--amber)':'var(--red)';}h+='<div class="calday'+(isT?' today':'')+(isSel?' selected':'')+'" style="background:'+(isSel?'':bg)+'" onclick="selectDay('+d+')"><div class="cdnum" style="color:'+(isT?'var(--blue)':'var(--tx2)')+'">'+d+'</div>'+(amt>0?'<div class="cdamt" style="color:'+tc+'">'+fmt(amt)+'</div>':'')+(dayInc[d]>0?'<div class="cdamt" style="color:var(--green);font-size:8px">+'+fmt(dayInc[d])+'</div>':'')+'</div>';}
+  for(var d=1;d<=dim;d++){
+    var amt=dayT[d]||0,isT=today.getFullYear()===year&&today.getMonth()===month&&today.getDate()===d,isSel=selDay===d;
+    var bg='',tc='var(--tx2)';
+    if(amt>0){var r=amt/maxA;bg=r<.33?'rgba(29,158,117,.12)':r<.66?'rgba(186,117,23,.15)':'rgba(216,90,48,.15)';tc=r<.33?'var(--green)':r<.66?'var(--amber)':'var(--red)';}
+    var fixedDot=(dayFixed[d]&&dayFixed[d].length)?'<div style="font-size:8px;color:var(--amber);margin-top:1px">📌'+dayFixed[d].length+'</div>':'';
+    h+='<div class="calday'+(isT?' today':'')+(isSel?' selected':'')+'" style="background:'+(isSel?'':bg)+'" onclick="selectDay('+d+')">'
+      +'<div class="cdnum" style="color:'+(isT?'var(--blue)':'var(--tx2)')+'">'+d+'</div>'
+      +(amt>0?'<div class="cdamt" style="color:'+tc+'">'+fmt(amt)+'</div>':'')
+      +(dayInc[d]>0?'<div class="cdamt" style="color:var(--green);font-size:8px">+'+fmt(dayInc[d])+'</div>':'')
+      +fixedDot
+      +'</div>';
+  }
   var rem=(firstDay+dim)%7===0?0:7-(firstDay+dim)%7;for(var d2=1;d2<=rem;d2++)h+='<div class="calday other"><div class="cdnum">'+d2+'</div></div>';
   document.getElementById('calGrid').innerHTML=h;if(selDay)showDayPanel(selDay);
 }
@@ -2418,9 +2437,11 @@ function showDayPanel(d){
     var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
     return day===d;
   });
+  var fixedDue=(D.fixed||[]).filter(function(f){return f.dueDay===d&&f.recurring;});
+  var paid=getPaid();
   var panel=document.getElementById('dayPanel');
   var ds=new Date(curDate.getFullYear(),curDate.getMonth(),d).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
-  if(!exps.length&&!incs.length){
+  if(!exps.length&&!incs.length&&!fixedDue.length){
     panel.innerHTML='<div style="font-size:13px;color:var(--tx3)">'+ds+' — no activity.</div>';
   } else {
     var total=exps.reduce(function(s,e){return s+e.amt;},0);
@@ -2428,7 +2449,17 @@ function showDayPanel(d){
     panel.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-size:13px;font-weight:500">'+ds+'</span>'
       +'<span style="font-size:13px">'+(totalInc>0?'<span style="color:var(--green);font-family:monospace">+'+fmt(totalInc)+'</span> ':'')+(total>0?'<span style="font-family:monospace">'+fmt(total)+'</span>':'')+'</span></div>'
       +incs.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--green)"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.source+'</span></div><span class="eamt" style="color:var(--green)">+'+fmt(e.amt)+'</span></div>';}).join('')
-      +exps.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+(getCatColor(e.cat))+'"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.cat+'</span></div><span class="eamt">'+fmt(e.amt)+'</span></div>';}).join('');
+      +exps.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+(getCatColor(e.cat))+'"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.cat+'</span></div><span class="eamt">'+fmt(e.amt)+'</span></div>';}).join('')
+      +(fixedDue.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr)"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--tx3);margin-bottom:6px">📌 Fixed due today</div>'
+        +fixedDue.map(function(f){
+          var isPaid=paid.indexOf(f.id)>-1;
+          return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--amber)"></div><span class="ename">'+esc(f.name)+'</span><span class="emeta">'+f.freq+'</span></div>'
+            +'<div style="display:flex;align-items:center;gap:8px">'
+            +(isPaid?'<span style="color:var(--green);font-size:11px">✓ Paid</span>':'<span style="color:var(--amber);font-size:11px">Pending</span>')
+            +'<span class="eamt">'+fmt(f.amt)+'</span>'
+            +'</div></div>';
+        }).join('')
+      +'</div>':'');
   }
   panel.style.display='block';
 }
