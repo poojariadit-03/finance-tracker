@@ -2413,14 +2413,22 @@ function showDayPanel(d){
     var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
     return day===d;
   });
+  var incs=(D.extraIncome||[]).filter(function(e){
+    if(!e.month||(e.month!==curDate.getFullYear()+'-'+String(curDate.getMonth()+1).padStart(2,'0')))return false;
+    var day=e.date?parseInt(e.date.slice(8,10)):new Date(e.date).getDate();
+    return day===d;
+  });
   var panel=document.getElementById('dayPanel');
   var ds=new Date(curDate.getFullYear(),curDate.getMonth(),d).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
-  if(!exps.length){
-    panel.innerHTML='<div style="font-size:13px;color:var(--tx3)">'+ds+' — no expenses.</div>';
+  if(!exps.length&&!incs.length){
+    panel.innerHTML='<div style="font-size:13px;color:var(--tx3)">'+ds+' — no activity.</div>';
   } else {
     var total=exps.reduce(function(s,e){return s+e.amt;},0);
-    panel.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-size:13px;font-weight:500">'+ds+'</span><span style="font-family:\'DM Mono\',monospace;font-size:13px">'+fmt(total)+'</span></div>'+
-      exps.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+(getCatColor(e.cat))+'"></div><span class="ename">'+e.name+'</span><span class="emeta">'+e.cat+'</span></div><span class="eamt">'+fmt(e.amt)+'</span></div>';}).join('');
+    var totalInc=incs.reduce(function(s,e){return s+e.amt;},0);
+    panel.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-size:13px;font-weight:500">'+ds+'</span>'
+      +'<span style="font-size:13px">'+(totalInc>0?'<span style="color:var(--green);font-family:monospace">+'+fmt(totalInc)+'</span> ':'')+(total>0?'<span style="font-family:monospace">'+fmt(total)+'</span>':'')+'</span></div>'
+      +incs.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:var(--green)"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.source+'</span></div><span class="eamt" style="color:var(--green)">+'+fmt(e.amt)+'</span></div>';}).join('')
+      +exps.map(function(e){return '<div class="erow"><div class="eleft"><div class="dot" style="background:'+(getCatColor(e.cat))+'"></div><span class="ename">'+esc(e.name)+'</span><span class="emeta">'+e.cat+'</span></div><span class="eamt">'+fmt(e.amt)+'</span></div>';}).join('');
   }
   panel.style.display='block';
 }
