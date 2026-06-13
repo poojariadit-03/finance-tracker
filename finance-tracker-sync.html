@@ -1851,7 +1851,11 @@ function renderAccounts(){
   /* Total balance summary */
   var totalBal=accs.reduce(function(s,a){return s+getAccountBalance(a.id);},0);
   var totalEl=document.getElementById('accTotalBal');
-  if(totalEl){totalEl.textContent=fmt(totalBal);totalEl.style.color=totalBal>=0?'var(--green)':'var(--red)';}
+  if(totalEl){
+    var locked=hasIncomePassword()&&!_incomeUnlocked;
+    totalEl.textContent=locked?'••••':fmt(totalBal);
+    totalEl.style.color=totalBal>=0?'var(--green)':'var(--red)';
+  }
   /* Low balance check */
   var lowAlerts=[];
   accs.forEach(function(a){
@@ -1882,7 +1886,11 @@ function renderAccounts(){
     var lowWarn=a.lowBalanceThreshold&&bal<a.lowBalanceThreshold?'<span style="background:var(--rbg);color:var(--red);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:6px">LOW</span>':'';
     var salBadge=D.config.salaryAccountId===a.id?'<span style="background:var(--gbg);color:var(--green);font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:6px">💰 SALARY</span>':'';
     var salNote=D.config.salaryAccountId===a.id&&sal>0?'<div style="font-size:10px;color:var(--green);margin-top:2px">+'+fmt(sal)+' salary credited</div>':'';
-    return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+lowWarn+salBadge+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">'+fmt(bal)+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+fmt(spent)+'</div>'+salNote+noteHtml+utilHtml+'<div style="display:flex;gap:6px;margin-top:8px"><button onclick="openAccountStatement(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">📋</button><button onclick="openEditAccount(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">✏️</button></div><button class="adel" onclick="removeAccount(\''+a.id+'\')">×</button></div>';}).join('');
+    var locked=hasIncomePassword()&&!_incomeUnlocked;
+    var balDisplay=locked?'••••':fmt(bal);
+    var spentDisplay=locked?'••••':fmt(spent);
+    var salNoteDisplay=locked?'':salNote;
+    return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+lowWarn+salBadge+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">'+balDisplay+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+spentDisplay+'</div>'+salNoteDisplay+noteHtml+utilHtml+'<div style="display:flex;gap:6px;margin-top:8px"><button onclick="openAccountStatement(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">📋</button><button onclick="openEditAccount(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">✏️</button></div><button class="adel" onclick="removeAccount(\''+a.id+'\')">×</button></div>';}).join('');
 }
 function populateAccSel(){var accs=D.accounts,sel=document.getElementById('expAcc');
   var fixAccSel=document.getElementById('fixAccId');
@@ -3431,6 +3439,8 @@ function applyIncomeLock(){
       btn.style.opacity='1';
     }
   });
+  /* Refresh accounts balance display */
+  renderAccounts();
 }
 function toggleMobileMenu(){var m=document.getElementById('mobileMenu');if(m)m.style.display=m.style.display==='none'?'block':'none';}
 function closeMobileMenu(){var m=document.getElementById('mobileMenu');if(m)m.style.display='none';}
