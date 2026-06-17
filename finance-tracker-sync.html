@@ -1924,10 +1924,19 @@ function renderAccounts(){
     var salNoteDisplay=locked?'':salNote;
     return '<div class="acard"><div class="atype" style="color:'+c+'">'+a.type+'</div><div class="aname">'+a.name+lowWarn+salBadge+'</div><div class="abal" style="color:'+(bal>=0?'var(--tx)':'var(--red)')+'">'+balDisplay+'</div><div style="font-size:11px;color:var(--tx3);margin-top:3px">Spent: '+spentDisplay+'</div>'+salNoteDisplay+noteHtml+utilHtml+'<div style="display:flex;gap:6px;margin-top:8px"><button onclick="openAccountStatement(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">📋</button><button onclick="openEditAccount(this.dataset.id)" data-id="'+a.id+'" class="btn-ghost" style="flex:1;font-size:11px;padding:4px">✏️</button></div><button class="adel" onclick="confirmDelete(\'account\',this.dataset.id,this.dataset.name)" data-id="'+a.id+'" data-name="'+esc(a.name)+'">×</button></div>';}).join('');
 }
-function populateAccSel(){var accs=D.accounts,sel=document.getElementById('expAcc');
+function populateAccSel(){
+  var accs=D.accounts,sel=document.getElementById('expAcc');
   var fixAccSel=document.getElementById('fixAccId');
-  if(fixAccSel)fixAccSel.innerHTML=accs.length?accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join(''):'<option value="">No accounts</option>';sel.innerHTML=accs.length?accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join(''):'<option value="">No accounts</option>';
-  var aeFilter=document.getElementById('expAccFilter');if(aeFilter)aeFilter.innerHTML='<option value="">All accounts</option>'+accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join('');
+  var opts=accs.length?accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join(''):'<option value="">No accounts</option>';
+  if(fixAccSel)fixAccSel.innerHTML=opts;
+  if(sel){
+    sel.innerHTML=opts;
+    /* Default to Cash account */
+    var cashAcc=accs.find(function(a){return a.type==='Cash'||a.name.toLowerCase()==='cash';});
+    if(cashAcc)sel.value=cashAcc.id;
+  }
+  var aeFilter=document.getElementById('expAccFilter');
+  if(aeFilter)aeFilter.innerHTML='<option value="">All accounts</option>'+accs.map(function(a){return '<option value="'+a.id+'">'+a.name+'</option>';}).join('');
 }
 
 /* ═══ EXPENSES ═══ */
