@@ -1204,7 +1204,7 @@ function loadFromFirebase(){
   document.getElementById('loadingTxt').textContent='Loading your data...';
   db.ref('finances/data').once('value').then(function(snap){
     var val=snap.val();
-    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.autoLogged)D.autoLogged=[];if(!D.fds)D.fds=[];if(!D.rds)D.rds=[];if(!D.extraIncome)D.extraIncome=[];if(!D.monthResetSeen)D.monthResetSeen=[];if(!D.config.theme)D.config.theme='auto';if(!D.config.fontSize)D.config.fontSize='normal';if(D.config.budgetCarryover===undefined)D.config.budgetCarryover=false;if(!D.config.dailyLimit)D.config.dailyLimit=0;if(!D.liabilities)D.liabilities=[];if(!D.customCategories)D.customCategories=[];if(!D.occasions)D.occasions=[];if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];}catch(e){initDefaults();}}
+    if(val){try{var ld=JSON.parse(val);D=ld;if(!D.paid)D.paid={};if(!D.autoLogged)D.autoLogged=[];if(!D.fds)D.fds=[];if(!D.rds)D.rds=[];if(!D.extraIncome)D.extraIncome=[];if(!D.monthResetSeen)D.monthResetSeen=[];if(!D.config.theme)D.config.theme='auto';if(!D.config.fontSize)D.config.fontSize='normal';if(D.config.budgetCarryover===undefined)D.config.budgetCarryover=false;if(!D.config.dailyLimit)D.config.dailyLimit=0;if(!D.liabilities)D.liabilities=[];if(!D.customCategories)D.customCategories=[];if(!D.occasions)D.occasions=[];if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];}catch(e){initDefaults();}}
     else initDefaults();
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='block';
@@ -1273,7 +1273,7 @@ function fmtF(n){return (Number(n)<0?'-':'')+'₹'+Math.abs(Number(n)).toLocaleS
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function mk(d){var t=d||curDate;return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');}
 function getExpenses(d){var m=mk(d);return D.expenses.filter(function(e){return e.month===m;});}
-function getPaid(d){return D.paid[mk(d)]||[];}
+function getPaid(d){if(!D.paid)D.paid={};return D.paid[mk(d)]||[];}
 function fixedMonthly(){return D.fixed.reduce(function(s,f){if(f.freq==='Daily')return s+f.amt*30;if(f.freq==='Weekly')return s+f.amt*4.33;if(f.freq==='Yearly')return s+f.amt/12;return s+f.amt;},0);}
 
 /* ═══ TABS / NAV ═══ */
@@ -2385,7 +2385,7 @@ function removeFixed(id){
   D.fixed=D.fixed.filter(function(f){return f.id!==id;});
   autoSave();renderFixed();recalc();
 }
-function togglePaid(id){var m=mk(),paid=D.paid[m]||[],idx=paid.indexOf(id);if(idx>-1)paid.splice(idx,1);else paid.push(id);D.paid[m]=paid;autoSave();renderFixed();checkReminders();}
+function togglePaid(id){if(!D.paid)D.paid={};var m=mk(),paid=D.paid[m]||[],idx=paid.indexOf(id);if(idx>-1)paid.splice(idx,1);else paid.push(id);D.paid[m]=paid;autoSave();renderFixed();checkReminders();}
 function renderFixed(){
   renderFixedSummary();
   var rawArr=D.fixed.slice().filter(function(f){
