@@ -1348,7 +1348,6 @@ function listenForChanges(){
 var _isDirty=false;
 function autoSave(){
   saveToCache(); /* Always save to cache immediately */
-  _isSaving=true;
   _isDirty=true;
   cleanupPaidData();
   setSyncStatus('syncing');
@@ -1357,19 +1356,19 @@ function autoSave(){
     savePendingData();
     _offlineQueue.push(Date.now());
     setSyncStatus('offline');
-    _isSaving=false;
     return;
   }
-  saveTimer=setTimeout(function(){saveToFirebase();},3000);
+  saveTimer=setTimeout(function(){saveToFirebase();},1500); /* Reduced from 3000ms */
 }
 function saveToFirebase(){
   if(!db)return;
-  db.ref('finances/data').set(JSON.stringify(D)).then(function(){
-    saveToCache();
+  var snapshot=JSON.stringify(D); /* Capture D at this moment */
+  _isSaving=true;
+  db.ref('finances/data').set(snapshot).then(function(){
     clearPendingData();
     _offlineQueue=[];
     setSyncStatus('synced');
-    setTimeout(function(){_isSaving=false;},1000); /* BUG FIX */
+    _isSaving=false; /* Release immediately — no extra 1s delay */
   }).catch(function(){
     setSyncStatus('error');
     savePendingData();
