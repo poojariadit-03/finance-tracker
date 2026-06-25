@@ -1285,20 +1285,58 @@ function loadFromFirebase(){
   /* Check if there is pending offline data to push first */
   var pending=loadPendingData();
   if(pending&&pending.data){
-    D=pending.data;
-    if(!D.paid)D.paid={};if(!D.autoLogged)D.autoLogged=[];
-    saveToCache();
-    db.ref('finances/data').set(JSON.stringify(D)).then(function(){
-      clearPendingData();showFtToast('Offline changes synced \u2713','success');
-      setSyncStatus('synced');
-      if(!document.getElementById('app').style.display||document.getElementById('app').style.display==='none'){
+    /* Fetch latest Firebase first, then merge pending on top to avoid overwriting online changes */
+    db.ref('finances/data').once('value').then(function(snap){
+      var val=snap.val();
+      var pend=pending.data;
+      if(!pend.paid)pend.paid={};if(!pend.autoLogged)pend.autoLogged=[];
+      if(!pend.fds)pend.fds=[];if(!pend.rds)pend.rds=[];
+      if(!pend.extraIncome)pend.extraIncome=[];if(!pend.lent)pend.lent=[];
+      if(!pend.transfers)pend.transfers=[];if(!pend.templates)pend.templates=[];
+      if(!pend.liabilities)pend.liabilities=[];if(!pend.customCategories)pend.customCategories=[];
+      if(val){
+        try{
+          var online=JSON.parse(val);
+          /* Merge arrays by id — both sides kept, pending wins on conflict */
+          function mergeArr(a,b){var m={};(a||[]).forEach(function(x){if(x.id)m[x.id]=x;});(b||[]).forEach(function(x){if(x.id)m[x.id]=x;});return Object.values(m);}
+          online.expenses=mergeArr(online.expenses,pend.expenses);
+          online.transfers=mergeArr(online.transfers,pend.transfers);
+          online.lent=mergeArr(online.lent,pend.lent);
+          /* Scalar/config sections: pending wins (user edited offline) */
+          online.config=pend.config||online.config;
+          online.accounts=pend.accounts||online.accounts;
+          online.fixed=pend.fixed||online.fixed;
+          online.goals=pend.goals||online.goals;
+          online.budgets=pend.budgets||online.budgets;
+          online.paid=pend.paid||online.paid;
+          D=online;
+        }catch(e){D=pend;}
+      } else {D=pend;}
+      if(!D.paid)D.paid={};if(!D.autoLogged)D.autoLogged=[];if(!D.fds)D.fds=[];if(!D.rds)D.rds=[];
+      if(!D.extraIncome)D.extraIncome=[];if(!D.monthResetSeen)D.monthResetSeen=[];
+      if(!D.liabilities)D.liabilities=[];if(!D.customCategories)D.customCategories=[];
+      if(!D.occasions)D.occasions=[];if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];
+      if(!D.config)D.config={};if(!D.config.theme)D.config.theme='auto';if(!D.config.fontSize)D.config.fontSize='normal';
+      saveToCache();
+      db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+        clearPendingData();showFtToast('Offline changes synced \u2713','success');
+        setSyncStatus('synced');
         document.getElementById('loading').style.display='none';
         document.getElementById('app').style.display='block';
         updateHeader();renderAll();
-      }
-      listenForChanges();
-    }).catch(function(e){
-      document.getElementById('loadingTxt').textContent='Error syncing offline data: '+e.message;
+        listenForChanges();
+      }).catch(function(e){
+        document.getElementById('loadingTxt').textContent='Error syncing: '+e.message;
+      });
+    }).catch(function(){
+      D=pending.data;saveToCache();
+      db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+        clearPendingData();showFtToast('Offline changes synced \u2713','success');
+        setSyncStatus('synced');
+        document.getElementById('loading').style.display='none';
+        document.getElementById('app').style.display='block';
+        updateHeader();renderAll();listenForChanges();
+      });
     });
     return;
   }
