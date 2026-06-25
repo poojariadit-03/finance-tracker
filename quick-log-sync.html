@@ -664,28 +664,54 @@ function loadFromFirebase(){
   /* Check if there is pending offline data to push first */
   var pending=loadPendingData();
   if(pending&&pending.data){
-    /* Use pending data as current D */
-    D=pending.data;
-    if(!D.extraIncome)D.extraIncome=[];if(!D.accounts)D.accounts=[];
-    if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.budgets)D.budgets={};
-    saveToCache();
-    /* Push pending data to Firebase */
-    db.ref('finances/data').set(JSON.stringify(D)).then(function(){
-      clearPendingData();
-      showToast('Offline expenses synced ✓','success');
-      setSyncStatus('synced');
-      /* Refresh UI */
-      if(!cached){
-        document.getElementById('loading').style.display='none';
-        document.getElementById('app').style.display='block';
-        initUI();
-      } else {
-        renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();
-      }
-      startFirebaseListener();
+    /* Fetch Firebase first, merge pending on top to avoid overwriting online changes */
+    db.ref('finances/data').once('value').then(function(snap){
+      var val=snap.val();
+      var pend=pending.data;
+      if(!pend.extraIncome)pend.extraIncome=[];if(!pend.accounts)pend.accounts=[];
+      if(!pend.lent)pend.lent=[];if(!pend.transfers)pend.transfers=[];if(!pend.budgets)pend.budgets={};
+      if(val){
+        try{
+          var online=JSON.parse(val);
+          function mergeArr(a,b){var m={};(a||[]).forEach(function(x){if(x.id)m[x.id]=x;});(b||[]).forEach(function(x){if(x.id)m[x.id]=x;});return Object.values(m);}
+          online.expenses=mergeArr(online.expenses,pend.expenses);
+          online.transfers=mergeArr(online.transfers,pend.transfers);
+          online.lent=mergeArr(online.lent,pend.lent);
+          online.config=pend.config||online.config;
+          online.accounts=pend.accounts||online.accounts;
+          online.fixed=pend.fixed||online.fixed;
+          online.budgets=pend.budgets||online.budgets;
+          D=online;
+        }catch(e){D=pend;}
+      } else {D=pend;}
+      if(!D.extraIncome)D.extraIncome=[];if(!D.accounts)D.accounts=[];
+      if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.budgets)D.budgets={};
+      saveToCache();
+      db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+        clearPendingData();
+        showToast('Offline expenses synced \u2713','success');
+        setSyncStatus('synced');
+        if(!cached){
+          document.getElementById('loading').style.display='none';
+          document.getElementById('app').style.display='block';
+          initUI();
+        } else {
+          renderAccs();renderList();renderMonthBar();renderQLScore();updateLentAlertQL();
+        }
+        startFirebaseListener();
+      }).catch(function(){
+        showToast('Sync failed \u2014 will retry','error');
+        doLoadFromFirebase(cached);
+      });
     }).catch(function(){
-      showToast('Sync failed — will retry','error');
-      doLoadFromFirebase(cached);
+      D=pending.data;saveToCache();
+      db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+        clearPendingData();showToast('Offline expenses synced \u2713','success');
+        setSyncStatus('synced');
+        if(!cached){document.getElementById('loading').style.display='none';document.getElementById('app').style.display='block';initUI();}
+        else{renderAccs();renderList();renderMonthBar();renderQLScore();}
+        startFirebaseListener();
+      }).catch(function(){doLoadFromFirebase(cached);});
     });
   } else {
     doLoadFromFirebase(cached);
@@ -723,7 +749,9 @@ function doLoadFromFirebase(cached){
 }
 
 function startFirebaseListener(){
+  var _qlSaving=false;
   db.ref('finances/data').on('value',function(snap){
+      if(_qlSaving)return; /* Skip self-echo during save */
       var v=snap.val();
       if(v){
         try{
@@ -738,6 +766,8 @@ function startFirebaseListener(){
         }catch(e){}
       }
     });
+  /* Expose flag setter for autoSave */
+  window._qlSetSaving=function(v){_qlSaving=v;};
 }
 
 /* ═══ FINANCIAL HEALTH SCORE (quick-log) ═══ */
@@ -848,16 +878,19 @@ function autoSave(){
     return;
   }
   saveTimer=setTimeout(function(){
+    if(window._qlSetSaving)window._qlSetSaving(true);
     db.ref('finances/data').set(JSON.stringify(D)).then(function(){
       setSyncStatus('synced');
       _offlineQueue=[];
-      clearPendingData(); /* Clear pending since Firebase is updated */
+      clearPendingData();
+      if(window._qlSetSaving)window._qlSetSaving(false);
     }).catch(function(){
       setSyncStatus('error');
-      savePendingData(); /* Save pending on error too */
+      savePendingData();
       _offlineQueue.push(Date.now());
+      if(window._qlSetSaving)window._qlSetSaving(false);
     });
-  },2000);
+  },1500);
 }
 function setSyncStatus(s){var dot=document.getElementById('syncDot'),lbl=document.getElementById('syncLabel');if(!dot)return;dot.className='sync-dot'+(s==='syncing'?' syncing':s==='error'?' error':s==='offline'?' error':'');lbl.textContent=s==='syncing'?'Syncing...':s==='error'?'Error':s==='offline'?'Offline':'Synced';}
 
