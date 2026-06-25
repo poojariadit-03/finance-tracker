@@ -384,6 +384,11 @@ body.fs-large{font-size:17px}body.fs-small{font-size:13px}
 </head>
 <body>
 
+<!-- OFFLINE BANNER -->
+<div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#D85A30;color:#fff;padding:8px 16px;font-size:13px;font-weight:600;align-items:center;justify-content:center;gap:8px">
+  <span>📡 You are offline — changes will sync when reconnected</span>
+</div>
+
 <!-- SETUP SCREEN -->
 <div id="setup">
   <div class="setup-box">
@@ -1149,6 +1154,32 @@ function showToast(msg,type){
 }
 
 var db=null,saveTimer=null,curDate=new Date(),selDay=null,_toastTimer=null;
+var _offlineQueue=[];
+var _isOnline=navigator.onLine;
+var LS_CACHE='ft_main_cache';
+var LS_PENDING='ft_main_pending';
+
+function saveToCache(){try{localStorage.setItem(LS_CACHE,JSON.stringify(D));}catch(e){}}
+function loadFromCache(){try{var c=localStorage.getItem(LS_CACHE);if(c)return JSON.parse(c);}catch(e){}return null;}
+function savePendingData(){try{localStorage.setItem(LS_PENDING,JSON.stringify({data:D,ts:Date.now()}));}catch(e){}}
+function clearPendingData(){try{localStorage.removeItem(LS_PENDING);}catch(e){}}
+function loadPendingData(){try{var p=localStorage.getItem(LS_PENDING);if(p)return JSON.parse(p);}catch(e){}return null;}
+function updateOnlineBanner(){var b=document.getElementById('offlineBanner');if(b)b.style.display=_isOnline?'none':'flex';}
+function flushOfflineQueue(){
+  if(!db)return;
+  db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+    _offlineQueue=[];clearPendingData();setSyncStatus('synced');
+    showFtToast('Synced \u2713','success');
+  }).catch(function(){setSyncStatus('error');});
+}
+window.addEventListener('online',function(){
+  _isOnline=true;updateOnlineBanner();
+  if(_offlineQueue.length&&db){showFtToast('Back online \u2014 syncing '+_offlineQueue.length+' change(s)...','');flushOfflineQueue();}
+});
+window.addEventListener('offline',function(){
+  _isOnline=false;updateOnlineBanner();
+  showFtToast('You are offline \u2014 changes will sync when reconnected','');
+});
 var _rangeFrom=null,_rangeTo=null,_qFilterMode='all',_fixedSearch='',_fixedSort='default',_bulkSelected=new Set();
 var _isSaving=false; /* BUG FIX: prevent listener overwrite during save */
 var _cat=null,_alloc=null,_trend=null,_hist=null,_acc=null;
@@ -1182,6 +1213,43 @@ function initFirebase(cfg){
   document.getElementById('setup').style.display='none';
   document.getElementById('loading').style.display='flex';
   document.getElementById('loadingTxt').textContent='Connecting to Firebase...';
+  /* If offline, load from cache immediately */
+  if(!navigator.onLine){
+    var cached=loadFromCache();
+    if(cached){
+      D=cached;
+      if(!D.paid)D.paid={};if(!D.autoLogged)D.autoLogged=[];if(!D.fds)D.fds=[];if(!D.rds)D.rds=[];
+      if(!D.extraIncome)D.extraIncome=[];if(!D.monthResetSeen)D.monthResetSeen=[];
+      if(!D.liabilities)D.liabilities=[];if(!D.customCategories)D.customCategories=[];
+      if(!D.occasions)D.occasions=[];if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];
+      document.getElementById('loading').style.display='none';
+      document.getElementById('app').style.display='block';
+      updateOnlineBanner();updateHeader();renderAll();setSyncStatus('offline');
+      /* When back online, connect Firebase and sync */
+      window.addEventListener('online',function(){
+        try{
+          if(!firebase.apps.length)firebase.initializeApp(cfg);
+          db=firebase.database();
+          updateOnlineBanner();
+          var pending=loadPendingData();
+          if(pending&&pending.data){
+            D=pending.data;
+            saveToCache();
+            db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+              clearPendingData();showFtToast('Offline changes synced \u2713','success');
+              setSyncStatus('synced');listenForChanges();
+            }).catch(function(){showFtToast('Sync failed','error');});
+          } else {
+            listenForChanges();
+          }
+        }catch(e){}
+      },{once:true});
+      return;
+    } else {
+      document.getElementById('loadingTxt').textContent='You are offline and no cached data found. Please connect to internet first.';
+      return;
+    }
+  }
   try{
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     db=firebase.database();
@@ -1202,6 +1270,38 @@ function disconnectFirebase(){
 }
 function loadFromFirebase(){
   document.getElementById('loadingTxt').textContent='Loading your data...';
+  /* Show cached data instantly while Firebase loads */
+  var cached=loadFromCache();
+  if(cached){
+    D=cached;
+    if(!D.paid)D.paid={};if(!D.autoLogged)D.autoLogged=[];if(!D.fds)D.fds=[];if(!D.rds)D.rds=[];
+    if(!D.extraIncome)D.extraIncome=[];if(!D.monthResetSeen)D.monthResetSeen=[];
+    if(!D.liabilities)D.liabilities=[];if(!D.customCategories)D.customCategories=[];
+    if(!D.occasions)D.occasions=[];if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];
+    document.getElementById('loading').style.display='none';
+    document.getElementById('app').style.display='block';
+    updateHeader();renderAll();setSyncStatus('synced');
+  }
+  /* Check if there is pending offline data to push first */
+  var pending=loadPendingData();
+  if(pending&&pending.data){
+    D=pending.data;
+    if(!D.paid)D.paid={};if(!D.autoLogged)D.autoLogged=[];
+    saveToCache();
+    db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+      clearPendingData();showFtToast('Offline changes synced \u2713','success');
+      setSyncStatus('synced');
+      if(!document.getElementById('app').style.display||document.getElementById('app').style.display==='none'){
+        document.getElementById('loading').style.display='none';
+        document.getElementById('app').style.display='block';
+        updateHeader();renderAll();
+      }
+      listenForChanges();
+    }).catch(function(e){
+      document.getElementById('loadingTxt').textContent='Error syncing offline data: '+e.message;
+    });
+    return;
+  }
   db.ref('finances/data').once('value').then(function(snap){
     var val=snap.val();
     if(val){try{var ld=JSON.parse(val);D=ld;if(!D.paid)D.paid={};if(!D.autoLogged)D.autoLogged=[];if(!D.fds)D.fds=[];if(!D.rds)D.rds=[];if(!D.extraIncome)D.extraIncome=[];if(!D.monthResetSeen)D.monthResetSeen=[];if(!D.config.theme)D.config.theme='auto';if(!D.config.fontSize)D.config.fontSize='normal';if(D.config.budgetCarryover===undefined)D.config.budgetCarryover=false;if(!D.config.dailyLimit)D.config.dailyLimit=0;if(!D.liabilities)D.liabilities=[];if(!D.customCategories)D.customCategories=[];if(!D.occasions)D.occasions=[];if(!D.lent)D.lent=[];if(!D.transfers)D.transfers=[];if(!D.templates)D.templates=[];}catch(e){initDefaults();}}
@@ -1231,6 +1331,7 @@ function listenForChanges(){
         if(!fresh.config)fresh.config={};if(!fresh.config.dailyLimit)fresh.config.dailyLimit=0;
         if(JSON.stringify(fresh)!==JSON.stringify(D)){
           D=fresh;
+          saveToCache(); /* Keep local cache in sync */
           /* Debounce rapid sync events — wait 300ms before re-rendering */
           if(renderTimer)clearTimeout(renderTimer);
           renderTimer=setTimeout(function(){
@@ -1246,25 +1347,41 @@ function listenForChanges(){
 }
 var _isDirty=false;
 function autoSave(){
+  saveToCache(); /* Always save to cache immediately */
   _isSaving=true;
   _isDirty=true;
   cleanupPaidData();
   setSyncStatus('syncing');
   if(saveTimer)clearTimeout(saveTimer);
+  if(!_isOnline){
+    savePendingData();
+    _offlineQueue.push(Date.now());
+    setSyncStatus('offline');
+    _isSaving=false;
+    return;
+  }
   saveTimer=setTimeout(function(){saveToFirebase();},3000);
 }
 function saveToFirebase(){
   if(!db)return;
   db.ref('finances/data').set(JSON.stringify(D)).then(function(){
+    saveToCache();
+    clearPendingData();
+    _offlineQueue=[];
     setSyncStatus('synced');
     setTimeout(function(){_isSaving=false;},1000); /* BUG FIX */
-  }).catch(function(){setSyncStatus('error');_isSaving=false;});
+  }).catch(function(){
+    setSyncStatus('error');
+    savePendingData();
+    _offlineQueue.push(Date.now());
+    _isSaving=false;
+  });
 }
 function setSyncStatus(s){
   var dot=document.getElementById('syncDot'),lbl=document.getElementById('syncLabel');
   if(!dot)return;
-  dot.className='sync-dot'+(s==='syncing'?' syncing':s==='error'?' error':'');
-  lbl.textContent=s==='syncing'?'Syncing...':s==='error'?'Sync error':'Synced';
+  dot.className='sync-dot'+(s==='syncing'?' syncing':s==='error'||s==='offline'?' error':'');
+  lbl.textContent=s==='syncing'?'Syncing...':s==='error'?'Sync error':s==='offline'?'Offline':'Synced';
 }
 
 /* ═══ FORMAT ═══ */
