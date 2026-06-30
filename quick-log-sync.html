@@ -485,6 +485,10 @@ input[type=date]:focus{border-color:var(--green)}
       <input type="text" id="editName">
     </div>
     <div class="modal-field">
+      <label>Date</label>
+      <input type="date" id="editDate">
+    </div>
+    <div class="modal-field">
       <label>Note</label>
       <input type="text" id="editNote" placeholder="optional">
     </div>
@@ -1336,6 +1340,7 @@ function openEditModal(id,type){
   var e=type==='expense'?D.expenses.find(function(x){return x.id===id;}):(D.extraIncome||[]).find(function(x){return x.id===id;});
   if(!e)return;
   document.getElementById('editName').value=e.name||'';
+  document.getElementById('editDate').value=(e.date||'').slice(0,10);
   document.getElementById('editNote').value=e.note||'';
   document.getElementById('editAmt').value=e.amt||'';
   var catSel=document.getElementById('editCat');
@@ -1350,13 +1355,16 @@ function closeEditModal(){document.getElementById('editModal').classList.remove(
 function saveEdit(){
   if(!editingId)return;
   var name=document.getElementById('editName').value.trim(),note=document.getElementById('editNote').value.trim(),amt=parseFloat(document.getElementById('editAmt').value),cat=document.getElementById('editCat').value,accId=document.getElementById('editAcc').value;
+  var dateVal=document.getElementById('editDate').value;
   if(!name||isNaN(amt)||amt<=0){showToast('Check name and amount','error');return;}
+  if(!dateVal){showToast('Pick a date','error');return;}
+  var newMonth=dateVal.slice(0,7);
   if(editingType==='expense'){
     var e=D.expenses.find(function(x){return x.id===editingId;});
-    if(e){e.name=name;e.note=note;e.amt=amt;e.cat=cat;e.accountId=accId;}
+    if(e){e.name=name;e.note=note;e.amt=amt;e.cat=cat;e.accountId=accId;e.date=dateVal;e.month=newMonth;}
   }else{
     var e=(D.extraIncome||[]).find(function(x){return x.id===editingId;});
-    if(e){e.name=name;e.note=note;e.amt=amt;e.accountId=accId;}
+    if(e){e.name=name;e.note=note;e.amt=amt;e.accountId=accId;e.date=dateVal;e.month=newMonth;}
   }
   autoSave();closeEditModal();renderList();renderMonthBar();updateCopyLast();
   showToast('Updated!','success');
